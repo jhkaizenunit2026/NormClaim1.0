@@ -38,7 +38,7 @@ PDF (discharge summary / lab report / bill)
 | **Naitik Kanha** | Team Leader | Madhav Institute of Technology and Science, Gwalior |
 | Sambhav Raj Onkar | Member | Madhav Institute of Technology and Science, Gwalior |
 | Pratik Harsude | Member | Madhav Institute of Technology and Science, Gwalior |
-| Pralakhy Kaushik | Member | Madhav Institute of Technology and Science, Gwalior |
+| Pralakshy Kaushik | Member | Madhav Institute of Technology and Science, Gwalior |
 
 ---
 
