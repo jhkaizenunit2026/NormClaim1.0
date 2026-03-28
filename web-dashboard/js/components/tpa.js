@@ -15,9 +15,9 @@ const TPAComponents = {
           <p>Review and approve incoming pre-authorization requests from hospitals.</p>
         </div>
         <div class="stats-grid animate-in-delay-1" style="grid-template-columns:repeat(3,1fr);">
-          <div class="stat-card teal"><div class="stat-label">Pending Review</div><div class="stat-value teal" id="tq-pending">—</div></div>
-          <div class="stat-card gold"><div class="stat-label">Today's Approvals</div><div class="stat-value gold" id="tq-approved">—</div></div>
-          <div class="stat-card red"><div class="stat-label">Rejections</div><div class="stat-value red" id="tq-rejected">—</div></div>
+          <div class="stat-card-react" id="tq-pending" data-value="—" data-label="Pending Review"></div>
+          <div class="stat-card-react" id="tq-approved" data-value="—" data-label="Today's Approvals"></div>
+          <div class="stat-card-react" id="tq-rejected" data-value="—" data-label="Rejections"></div>
         </div>
         <div class="card animate-in-delay-2" style="padding:0;overflow:hidden;">
           <div style="padding:var(--sp-5) var(--sp-6);border-bottom:1px solid var(--border-subtle);background:var(--bg-elevated);display:flex;align-items:center;justify-content:space-between;">
@@ -36,10 +36,11 @@ const TPAComponents = {
     catch(e) { claims = DEMO_CLAIMS.filter(c => c.status === CLAIM_STATUS.PRE_AUTH_INITIATED); }
     if (!claims.length) claims = DEMO_CLAIMS;
 
-    const el = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
-    el('tq-pending', claims.filter(c => c.status === CLAIM_STATUS.PRE_AUTH_INITIATED).length);
-    el('tq-approved', claims.filter(c => c.status === CLAIM_STATUS.PRE_AUTH_APPROVED).length);
-    el('tq-rejected', 0);
+    if (window.__setStatCardValue) {
+      window.__setStatCardValue('tq-pending', String(claims.filter(c => c.status === CLAIM_STATUS.PRE_AUTH_INITIATED).length));
+      window.__setStatCardValue('tq-approved', String(claims.filter(c => c.status === CLAIM_STATUS.PRE_AUTH_APPROVED).length));
+      window.__setStatCardValue('tq-rejected', '0');
+    }
 
     const tbody = document.getElementById('tq-tbody');
     if (!tbody) return;

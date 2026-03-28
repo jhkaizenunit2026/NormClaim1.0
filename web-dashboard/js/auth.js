@@ -1,83 +1,66 @@
 // ═══════════════════════════════════════════════════════════════
 // NormClaim — Auth Store & Role Management
+// Uses LocalDB for self-contained authentication (no backend)
 // ═══════════════════════════════════════════════════════════════
 
 const AuthStore = {
   _user: null,
   _listeners: [],
 
-  async init() {
-    try {
-      const sb = await window.NormClaimSupabase.getClient();
-      const { data, error } = await sb.auth.getSession();
-      if (error) throw error;
-
-      const session = data?.session || null;
-      if (!session) {
-        this._user = null;
-        localStorage.removeItem('nc_user');
-        this._notify();
-        return;
-      }
-
-      const role = localStorage.getItem('nc_role') || session.user?.user_metadata?.role || ROLES.HOSPITAL;
+  init() {
+    // Restore session from LocalDB
+    const session = LocalDB.getSession();
+    if (session) {
       this._user = {
-        id: session.user?.id,
-        email: session.user?.email,
-        name: session.user?.user_metadata?.name || session.user?.email || 'User',
-        role,
-        token: session.access_token,
+        id: session.userId,
+        email: session.email,
+        name: session.name,
+        role: session.role,
+        token: session.token,
       };
-
-      localStorage.setItem('nc_user', JSON.stringify(this._user));
-      this._notify();
-    } catch (e) {
+    } else {
       this._user = null;
-      localStorage.removeItem('nc_user');
-      this._notify();
     }
+    this._notify();
   },
 
   getUser() { return this._user; },
   getRole() { return this._user?.role || null; },
   isLoggedIn() { return !!this._user; },
 
-  async login(userData) {
-    const sb = await window.NormClaimSupabase.getClient();
-    const { data, error } = await sb.auth.signInWithPassword({
-      email: userData.email,
-      password: userData.password,
-    });
-    if (error) throw error;
+  // ── Login (email + password + role) ──────────────────────────
+  async login({ email, password, role, name }) {
+    // First sign in to validate credentials
+    const session = LocalDB.signIn({ email, password });
 
-    const session = data?.session;
-    if (!session) {
-      throw new Error('Supabase session was not created.');
-    }
+    // If a role was explicitly chosen, update the user's session role
+    const finalRole = role || session.role;
 
     this._user = {
-      id: session.user?.id,
-      email: session.user?.email,
-      role: userData.role,
-      name: userData.name || session.user?.email || 'User',
-      token: session.access_token,
+      id: session.userId,
+      email: session.email,
+      name: name || session.name,
+      role: finalRole,
+      token: session.token,
     };
 
-    localStorage.setItem('nc_role', userData.role);
-    localStorage.setItem('nc_user', JSON.stringify(this._user));
+    localStorage.setItem('nc_role', finalRole);
     this._notify();
     return this._user;
   },
 
+  // ── Sign Up (creates account + auto-signs-in) ───────────────
+  async signUp({ email, password, name, role }) {
+    // Create the user
+    LocalDB.signUp({ email, password, name, role });
+    // Automatically sign them in
+    return this.login({ email, password, role, name });
+  },
+
+  // ── Logout ────────────────────────────────────────────────────
   async logout() {
-    try {
-      const sb = await window.NormClaimSupabase.getClient();
-      await sb.auth.signOut();
-    } catch (e) {
-      // Ignore sign-out race/network errors and clear local session regardless.
-    }
+    LocalDB.signOut();
     this._user = null;
-    localStorage.removeItem('nc_user');
     localStorage.removeItem('nc_role');
     this._notify();
     Router.navigate('login');

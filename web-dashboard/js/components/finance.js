@@ -15,9 +15,9 @@ const FinanceComponents = {
           <p>Pending UTR entries and settlement letters requiring finance team action.</p>
         </div>
         <div class="stats-grid animate-in-delay-1" style="grid-template-columns:repeat(3,1fr);">
-          <div class="stat-card gold"><div class="stat-label">Pending Entries</div><div class="stat-value gold" id="fa-pending">—</div></div>
-          <div class="stat-card green"><div class="stat-label">Processed Today</div><div class="stat-value green" id="fa-processed">—</div></div>
-          <div class="stat-card teal"><div class="stat-label">Total Outstanding</div><div class="stat-value teal" id="fa-outstanding">—</div></div>
+          <div class="stat-card-react" id="fa-pending" data-value="—" data-label="Pending Entries"></div>
+          <div class="stat-card-react" id="fa-processed" data-value="—" data-label="Processed Today"></div>
+          <div class="stat-card-react" id="fa-outstanding" data-value="—" data-label="Total Outstanding"></div>
         </div>
         <div class="card animate-in-delay-2" style="padding:0;overflow:hidden;">
           <table><thead><tr><th>Claim ID</th><th>Patient</th><th>Settlement Amount</th><th>UTR</th><th>Status</th><th>Action</th></tr></thead>
@@ -32,10 +32,11 @@ const FinanceComponents = {
     catch(e) { claims = DEMO_CLAIMS.filter(c => isAtOrPast(c.status, CLAIM_STATUS.SETTLEMENT_ISSUED)); }
     if (!claims.length) claims = DEMO_CLAIMS.filter(c => isAtOrPast(c.status, CLAIM_STATUS.SETTLEMENT_ISSUED));
 
-    const el = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
-    el('fa-pending', claims.filter(c => c.status === CLAIM_STATUS.SETTLEMENT_ISSUED).length);
-    el('fa-processed', claims.filter(c => c.status === CLAIM_STATUS.FINANCE_PROCESSED).length);
-    el('fa-outstanding', formatINR(claims.reduce((s, c) => s + (c.finalSettlementAmount || c.tpaPayableAmount || 0), 0)));
+    if (window.__setStatCardValue) {
+      window.__setStatCardValue('fa-pending', String(claims.filter(c => c.status === CLAIM_STATUS.SETTLEMENT_ISSUED).length));
+      window.__setStatCardValue('fa-processed', String(claims.filter(c => c.status === CLAIM_STATUS.FINANCE_PROCESSED).length));
+      window.__setStatCardValue('fa-outstanding', formatINR(claims.reduce((s, c) => s + (c.finalSettlementAmount || c.tpaPayableAmount || 0), 0)));
+    }
 
     const tbody = document.getElementById('fa-tbody');
     if (!tbody) return;
@@ -137,10 +138,10 @@ const FinanceComponents = {
           <p>Final case reconciliation — verify payments, close settlements, and flag follow-ups.</p>
         </div>
         <div class="stats-grid animate-in-delay-1" style="grid-template-columns:repeat(4,1fr);">
-          <div class="stat-card green"><div class="stat-label">Closed</div><div class="stat-value green" id="fr-closed">—</div></div>
-          <div class="stat-card gold"><div class="stat-label">Pending Close</div><div class="stat-value gold" id="fr-pending">—</div></div>
-          <div class="stat-card teal"><div class="stat-label">Total Settled</div><div class="stat-value teal" id="fr-total">—</div></div>
-          <div class="stat-card red"><div class="stat-label">Follow-ups</div><div class="stat-value red" id="fr-followups">—</div></div>
+          <div class="stat-card-react" id="fr-closed" data-value="—" data-label="Closed"></div>
+          <div class="stat-card-react" id="fr-pending" data-value="—" data-label="Pending Close"></div>
+          <div class="stat-card-react" id="fr-total" data-value="—" data-label="Total Settled"></div>
+          <div class="stat-card-react" id="fr-followups" data-value="—" data-label="Follow-ups"></div>
         </div>
         <div class="card animate-in-delay-2" style="padding:0;overflow:hidden;">
           <table><thead><tr><th>Claim ID</th><th>Patient</th><th>Settlement</th><th>UTR</th><th>Status</th><th>Action</th></tr></thead>
@@ -155,11 +156,12 @@ const FinanceComponents = {
     const finClaims = claims.filter(c => isAtOrPast(c.status, CLAIM_STATUS.FINANCE_PROCESSED));
     if (!finClaims.length) finClaims.push(...DEMO_CLAIMS.filter(c => isAtOrPast(c.status, CLAIM_STATUS.SETTLEMENT_ISSUED)));
 
-    const el = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
-    el('fr-closed', finClaims.filter(c => c.status === CLAIM_STATUS.CLOSED).length);
-    el('fr-pending', finClaims.filter(c => c.status !== CLAIM_STATUS.CLOSED).length);
-    el('fr-total', formatINR(finClaims.reduce((s, c) => s + (c.finalSettlementAmount || 0), 0)));
-    el('fr-followups', 0);
+    if (window.__setStatCardValue) {
+      window.__setStatCardValue('fr-closed', String(finClaims.filter(c => c.status === CLAIM_STATUS.CLOSED).length));
+      window.__setStatCardValue('fr-pending', String(finClaims.filter(c => c.status !== CLAIM_STATUS.CLOSED).length));
+      window.__setStatCardValue('fr-total', formatINR(finClaims.reduce((s, c) => s + (c.finalSettlementAmount || 0), 0)));
+      window.__setStatCardValue('fr-followups', '0');
+    }
 
     const tbody = document.getElementById('fr-tbody');
     if (!tbody) return;
