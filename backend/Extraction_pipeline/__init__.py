@@ -1,36 +1,16 @@
 """
-preauth_module — NormClaim Pre-Auth Auto-Fill Module
-=====================================================
-Public API surface:
+NormClaim pre-auth / extraction package.
 
-    from preauth_module import PreAuthOrchestrator, CorrectionHandler
-    from preauth_module.database import get_supabase, get_google_api_key
-
-Quick start:
-    from preauth_module import PreAuthOrchestrator
-    from preauth_module.database import get_supabase, get_google_api_key
-
-    orchestrator = PreAuthOrchestrator(get_supabase(), get_google_api_key())
-    result = orchestrator.process(pre_auth_form_id="<uuid>", requesting_user_id="<uuid>")
-    print(result["form_status"])   # "auto_filled" or "pending_manual"
-    print(result["auto_filled_fields"])
+Heavy modules (OCR, PyMuPDF, Gemini pipeline) load only when accessed, so
+`from Extraction_pipeline.database import get_supabase` works without importing pymupdf.
 """
 
-from .extraction_pipeline import (
-    CombinedExtraction,
-    DiagnosisReportExtraction,
-    ExtractionPipeline,
-    IdProofExtraction,
-    OCRProcessor,
-    ReferralExtraction,
-)
-from .pre_auth_filling import (
-    CorrectionHandler,
-    PreAuthFiller,
-    PreAuthOrchestrator,
-)
+from __future__ import annotations
+
+from typing import Any
 
 __all__ = [
+    "ABHALookupService",
     "ExtractionPipeline",
     "PreAuthFiller",
     "PreAuthOrchestrator",
@@ -41,3 +21,26 @@ __all__ = [
     "DiagnosisReportExtraction",
     "ReferralExtraction",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    if name == "ABHALookupService":
+        from .abha_lookup import ABHALookupService
+
+        return ABHALookupService
+    if name in (
+        "CombinedExtraction",
+        "DiagnosisReportExtraction",
+        "ExtractionPipeline",
+        "IdProofExtraction",
+        "OCRProcessor",
+        "ReferralExtraction",
+    ):
+        from . import extraction_pipeline as _ep
+
+        return getattr(_ep, name)
+    if name in ("PreAuthFiller", "PreAuthOrchestrator", "CorrectionHandler"):
+        from . import pre_auth_filling as _pf
+
+        return getattr(_pf, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

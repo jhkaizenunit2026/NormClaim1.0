@@ -42,6 +42,7 @@ from PIL import Image
 from pydantic import BaseModel, Field, field_validator
 from supabase import Client
 
+from .abha_lookup import ABHALookupService
 from .text_features import (
     build_section_map,
     detect_script_enum_value,
@@ -400,8 +401,9 @@ class ExtractionPipeline:
       3. Download files from Supabase Storage
       4. OCR / text extract each file
       5. Run Gemini structured extraction per doc_type
-      6. Write result to ai_extraction_records
-      7. Log to audit_logs
+      6. ABHA / hospital demographics merge (ABHA wins)
+      7. Write result to ai_extraction_records
+      8. Log to audit_logs
 
     Usage:
         pipeline = ExtractionPipeline(supabase_client, google_api_key)
@@ -648,6 +650,7 @@ class ExtractionPipeline:
         combined: CombinedExtraction,
         source_urls: list[str],
         model_version: str = "gemini-2.0-flash",
+        enhanced_patient_identity: dict | None = None,
     ) -> str:
         """
         Write extraction results to ai_extraction_records.
@@ -680,6 +683,11 @@ class ExtractionPipeline:
                     id_proof.model_dump(mode="json", exclude_none=True)
                     if id_proof
                     else None
+                ),
+                **(
+                    {"enhanced_patient_identity": enhanced_patient_identity}
+                    if enhanced_patient_identity
+                    else {}
                 ),
             },
             "encounter_snapshot": {
@@ -876,7 +884,35 @@ class ExtractionPipeline:
                 f"Extraction aborted because required results are missing: {missing_doc_types}"
             )
 
-        # 6. Build combined text for section mapping and negation detection
+        # 6. ABHA / hospital demographics overlay (ABHA-verified data wins over OCR)
+        abha_svc = ABHALookupService(self.db)
+        extracted_abha = id_proof_result.abha_id if id_proof_result else None
+        authority_data, identity_source = abha_svc.resolve_demographics(
+            extracted_abha, patient_id
+        )
+        id_proof_result = abha_svc.merge_with_extraction(authority_data, id_proof_result)
+        enhanced_patient_identity = abha_svc.build_enhanced_identity_json(
+            id_proof_result,
+            diag_result,
+            referral_result,
+            identity_source,
+            documents_verified=True,
+        )
+        self._audit_log(
+            patient_id=patient_id,
+            stage="extraction",
+            action="pre_auth.abha_lookup",
+            table_affected="patients",
+            record_id=patient_id,
+            diff_snapshot={
+                "pre_auth_form_id": pre_auth_form_id,
+                "source": identity_source,
+                "enhanced_patient_identity": enhanced_patient_identity,
+            },
+            user_id=requesting_user_id,
+        )
+
+        # 7. Build combined text for section mapping and negation detection
         combined_text = "\n\n".join(all_texts)
         section_map = build_section_map(combined_text)
         negated_spans = extract_negated_spans(combined_text)
@@ -899,15 +935,16 @@ class ExtractionPipeline:
             overall_confidence=overall_confidence,
         )
 
-        # 7. Write to ai_extraction_records
+        # 8. Write to ai_extraction_records
         ai_extraction_id = self._write_ai_extraction_record(
             patient_id=patient_id,
             pre_auth_form_id=pre_auth_form_id,
             combined=combined,
             source_urls=source_urls,
+            enhanced_patient_identity=enhanced_patient_identity,
         )
 
-        # 8. Audit log success
+        # 9. Audit log success
         self._audit_log(
             patient_id=patient_id,
             stage="extraction",

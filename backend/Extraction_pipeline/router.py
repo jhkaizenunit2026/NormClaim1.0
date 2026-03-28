@@ -11,6 +11,8 @@ Endpoints:
     GET  /api/preauth/status/{pre_auth_form_id}       — get current form status
     POST /api/preauth/correct/{pre_auth_form_id}      — apply human correction
     GET  /api/preauth/confidence/{pre_auth_form_id}   — get confidence report
+    POST /api/preauth/approve/{pre_auth_form_id}      — set form_status to approved
+    POST /api/preauth/reject/{pre_auth_form_id}       — set form_status to rejected (+ reason in audit)
 
 Python 3.11 required.
 """
@@ -18,6 +20,8 @@ Python 3.11 required.
 from __future__ import annotations
 
 import logging
+import uuid
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
 
@@ -108,6 +112,33 @@ def _assert_can_access_pre_auth_form(supabase: Any, pre_auth_form_id: str, curre
     )
 
 
+def _preauth_audit_log(
+    supabase: Any,
+    *,
+    patient_id: str | None,
+    user_id: str | None,
+    action: str,
+    record_id: str | None,
+    diff_snapshot: dict | None = None,
+) -> None:
+    """Append-only audit_logs row (same shape as PreAuthFiller._audit_log)."""
+    row = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "patient_id": patient_id,
+        "stage": "pre_auth",
+        "action": action,
+        "table_affected": "pre_auth_forms",
+        "record_id": record_id,
+        "diff_snapshot": diff_snapshot or {},
+        "logged_at": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        supabase.table("audit_logs").insert(row).execute()
+    except Exception as exc:
+        logger.error("audit_log write failed: %s", exc)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # REQUEST / RESPONSE MODELS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -142,6 +173,21 @@ class CorrectionResponse(BaseModel):
     field_name: str
     new_status: str
     all_mandatory_filled: bool
+    message: str
+
+
+class RejectRequest(BaseModel):
+    reason: str = Field(
+        ...,
+        min_length=1,
+        max_length=4000,
+        description="Rejection reason (stored in audit_logs; add DB column if UI must query it)",
+    )
+
+
+class ApprovalActionResponse(BaseModel):
+    pre_auth_form_id: str
+    form_status: str
     message: str
 
 
@@ -273,6 +319,112 @@ async def apply_correction(
             status_code=500,
             detail="Correction could not be applied due to an internal error.",
         )
+
+
+@router.post(
+    "/approve/{pre_auth_form_id}",
+    response_model=ApprovalActionResponse,
+    summary="Approve pre-auth form (workflow)",
+)
+async def approve_pre_auth_form(
+    pre_auth_form_id: str,
+    current_user: dict = Depends(require_user),
+):
+    """
+    Sets `pre_auth_forms.form_status` to `approved`.
+    Cannot approve a form that was already rejected.
+    """
+    supabase = get_supabase()
+    form = _assert_can_access_pre_auth_form(supabase, pre_auth_form_id, current_user)
+    patient_id = form.get("patient_id")
+    prior = str(form.get("form_status") or "draft")
+
+    if prior == "rejected":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot approve a rejected pre-auth form.",
+        )
+    if prior == "approved":
+        return ApprovalActionResponse(
+            pre_auth_form_id=pre_auth_form_id,
+            form_status="approved",
+            message="Form is already approved.",
+        )
+
+    supabase.table("pre_auth_forms").update({"form_status": "approved"}).eq(
+        "id", pre_auth_form_id
+    ).execute()
+
+    _preauth_audit_log(
+        supabase,
+        patient_id=str(patient_id) if patient_id else None,
+        user_id=current_user.get("id"),
+        action="pre_auth.approved",
+        record_id=pre_auth_form_id,
+        diff_snapshot={"previous_form_status": prior, "new_form_status": "approved"},
+    )
+
+    return ApprovalActionResponse(
+        pre_auth_form_id=pre_auth_form_id,
+        form_status="approved",
+        message="Pre-auth form approved.",
+    )
+
+
+@router.post(
+    "/reject/{pre_auth_form_id}",
+    response_model=ApprovalActionResponse,
+    summary="Reject pre-auth form (workflow)",
+)
+async def reject_pre_auth_form(
+    pre_auth_form_id: str,
+    body: RejectRequest,
+    current_user: dict = Depends(require_user),
+):
+    """
+    Sets `pre_auth_forms.form_status` to `rejected`.
+    Rejection reason is written to `audit_logs` (append-only).
+    Cannot reject a form that is already approved.
+    """
+    supabase = get_supabase()
+    form = _assert_can_access_pre_auth_form(supabase, pre_auth_form_id, current_user)
+    patient_id = form.get("patient_id")
+    prior = str(form.get("form_status") or "draft")
+
+    if prior == "approved":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot reject an approved pre-auth form.",
+        )
+    if prior == "rejected":
+        return ApprovalActionResponse(
+            pre_auth_form_id=pre_auth_form_id,
+            form_status="rejected",
+            message="Form is already rejected.",
+        )
+
+    supabase.table("pre_auth_forms").update({"form_status": "rejected"}).eq(
+        "id", pre_auth_form_id
+    ).execute()
+
+    _preauth_audit_log(
+        supabase,
+        patient_id=str(patient_id) if patient_id else None,
+        user_id=current_user.get("id"),
+        action="pre_auth.rejected",
+        record_id=pre_auth_form_id,
+        diff_snapshot={
+            "previous_form_status": prior,
+            "new_form_status": "rejected",
+            "reason": body.reason,
+        },
+    )
+
+    return ApprovalActionResponse(
+        pre_auth_form_id=pre_auth_form_id,
+        form_status="rejected",
+        message="Pre-auth form rejected.",
+    )
 
 
 @router.get(

@@ -5,7 +5,7 @@ Handles AI extraction of clinical entities from uploaded documents.
 
 from fastapi import APIRouter, HTTPException
 from models.schemas import ExtractionResult
-from services.extractor import extract_from_document
+from services.extractor import GeminiQuotaExceededError, extract_from_document, resolved_gemini_model
 from routers.documents import DOCUMENTS
 
 router = APIRouter(prefix="/api/extract", tags=["Extraction"])
@@ -42,6 +42,15 @@ async def extract_document(document_id: str):
 
     try:
         extraction_result = extract_from_document(file_bytes, document_id)
+    except GeminiQuotaExceededError as e:
+        detail: dict = {
+            "code": "GEMINI_QUOTA_EXHAUSTED",
+            "message": str(e),
+            "model": resolved_gemini_model(),
+        }
+        if e.provider_details:
+            detail["provider_details"] = e.provider_details
+        raise HTTPException(status_code=503, detail=detail)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Extraction error: {str(e)}")
 
