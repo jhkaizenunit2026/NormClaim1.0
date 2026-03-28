@@ -1,0 +1,499 @@
+/* ═══════════════════════════════════════════════════════════════
+   NormClaim — App-Specific Styles (TPA Migration)
+   Extends the base style.css with new components for the
+   11-stage workflow architecture.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Stage Progress Bar ───────────────────────────────────── */
+.stage-progress-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  overflow-x: auto;
+  padding: var(--sp-4) var(--sp-2);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  scrollbar-width: thin;
+}
+
+.spb-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  flex: 1;
+  min-width: 80px;
+  padding: 0 var(--sp-1);
+  text-align: center;
+}
+
+.spb-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border: 2px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  transition: all 0.3s ease;
+  z-index: 2;
+  position: relative;
+}
+
+.spb-step.complete .spb-dot {
+  background: var(--stage-color, var(--teal));
+  border-color: var(--stage-color, var(--teal));
+  color: #fff;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--stage-color, var(--teal)) 40%, transparent);
+}
+
+.spb-step.current .spb-dot {
+  background: var(--stage-color, var(--teal));
+  border-color: var(--stage-color, var(--teal));
+  color: #fff;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--stage-color, var(--teal)) 50%, transparent);
+  animation: pulse-glow 2s ease infinite;
+}
+
+.spb-step.future .spb-dot {
+  background: var(--bg-elevated);
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
+}
+
+.spb-label {
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-top: var(--sp-2);
+  line-height: 1.2;
+  max-width: 80px;
+}
+
+.spb-step.current .spb-label { color: var(--stage-text, var(--teal-bright)); font-weight: 600; }
+.spb-step.complete .spb-label { color: var(--text-secondary); }
+
+.spb-connector {
+  position: absolute;
+  top: 14px;
+  left: calc(50% + 16px);
+  width: calc(100% - 32px);
+  height: 2px;
+  background: var(--border-subtle);
+  z-index: 1;
+}
+
+.spb-step.complete .spb-connector { background: var(--stage-color, var(--teal)); }
+
+/* ─── Login Page ───────────────────────────────────────────── */
+.login-page {
+  min-height: calc(100vh - var(--nav-h));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-8);
+  background: radial-gradient(ellipse at 50% 0%, rgba(2,128,144,0.08) 0%, transparent 60%);
+}
+
+.login-container {
+  max-width: 720px;
+  width: 100%;
+  text-align: center;
+}
+
+.login-brand {
+  margin-bottom: var(--sp-8);
+}
+
+.role-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-8);
+}
+
+.role-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  padding: var(--sp-6) var(--sp-5);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  font-family: var(--font-body);
+  color: var(--text-primary);
+}
+
+.role-card:hover {
+  border-color: var(--border-active);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-teal);
+  background: var(--bg-elevated);
+}
+
+.role-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  transition: transform 0.2s ease;
+}
+
+.role-card:hover .role-icon { transform: scale(1.15); }
+
+.role-name {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.role-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.role-stages { margin-top: var(--sp-2); }
+
+.login-footer {
+  display: flex;
+  justify-content: center;
+  gap: var(--sp-3);
+}
+
+/* ─── Form Styles ──────────────────────────────────────────── */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+/* ─── Summary Rows ─────────────────────────────────────────── */
+.summary-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.summary-row:last-child { border-bottom: none; }
+
+/* ─── Audit Timeline ──────────────────────────────────────── */
+.audit-timeline {
+  position: relative;
+  padding-left: var(--sp-6);
+}
+
+.audit-entry {
+  position: relative;
+  padding-bottom: var(--sp-5);
+  padding-left: var(--sp-5);
+}
+
+.audit-entry:last-child { padding-bottom: 0; }
+
+.audit-dot {
+  position: absolute;
+  left: -8px;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-base);
+  z-index: 2;
+}
+
+.audit-connector {
+  position: absolute;
+  left: -3px;
+  top: 18px;
+  width: 2px;
+  height: calc(100% - 10px);
+  background: var(--border-subtle);
+}
+
+.audit-entry:last-child .audit-connector { display: none; }
+
+.audit-action {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.audit-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+/* ─── Document Uploader ────────────────────────────────────── */
+.doc-uploader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.doc-uploader-checklist {
+  margin-bottom: var(--sp-2);
+}
+
+.doc-check-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: 0.85rem;
+  padding: var(--sp-2) 0;
+  color: var(--text-secondary);
+}
+
+.doc-check-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.doc-check-icon.pending { color: var(--text-muted); }
+.doc-check-icon.done { color: var(--green); }
+
+.doc-upload-zone {
+  border: 2px dashed var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: var(--sp-8) var(--sp-5);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.doc-upload-zone:hover,
+.doc-upload-zone.drag-over {
+  border-color: var(--teal);
+  background: var(--teal-faint);
+}
+
+.upload-icon-sm {
+  width: 40px;
+  height: 40px;
+  background: var(--teal-faint);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--teal-bright);
+  margin-bottom: var(--sp-2);
+}
+
+.doc-upload-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.doc-upload-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  font-size: 0.82rem;
+}
+
+.doc-upload-name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doc-upload-status { font-size: 0.75rem; color: var(--text-muted); }
+
+/* ─── Notification Bell ────────────────────────────────────── */
+.nav-notif-wrap {
+  position: relative;
+}
+
+.notif-bell {
+  position: relative;
+  cursor: pointer;
+  padding: var(--sp-2);
+  border-radius: var(--r-sm);
+  transition: background 0.15s ease;
+  color: var(--text-secondary);
+}
+
+.notif-bell:hover {
+  background: var(--teal-faint);
+  color: var(--teal-bright);
+}
+
+.notif-count {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: var(--red);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg-base);
+}
+
+.notif-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 320px;
+  max-height: 400px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.notif-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.notif-dropdown-list {
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.notif-item {
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.notif-item:hover { background: var(--teal-faint); }
+.notif-item.unread { border-left: 3px solid var(--teal); }
+.notif-item.urgent { border-left-color: var(--red); }
+
+.notif-msg {
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.notif-time {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* ─── SLA Timer ────────────────────────────────────────────── */
+.sla-timer {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--gold-faint);
+  border: 1px solid rgba(245,166,35,0.3);
+  border-radius: var(--r-md);
+}
+
+/* ─── Page Loading ─────────────────────────────────────────── */
+.page-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+}
+
+/* ─── Hero Grid ────────────────────────────────────────────── */
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-6);
+  align-items: start;
+}
+
+/* ─── Card SM ──────────────────────────────────────────────── */
+.card-sm {
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+}
+
+/* ─── Responsive ────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .role-cards { grid-template-columns: 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
+  .hero-grid { grid-template-columns: 1fr; }
+  .spb-step { min-width: 60px; }
+  .spb-label { font-size: 0.5rem; }
+  .notif-dropdown { right: -60px; width: 280px; }
+}
+
+@media (max-width: 480px) {
+  .login-page { padding: var(--sp-4); }
+  .stage-progress-bar { gap: 0; }
+}

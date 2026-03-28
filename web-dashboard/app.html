@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NormClaim — TPA & Hospital Claims Management</title>
+  <meta name="description"
+    content="11-stage TPA and Hospital Claims Management System — Pre-Auth to Settlement workflow with role-based access." />
+  <link rel="stylesheet" href="assets/style.css" />
+  <link rel="stylesheet" href="assets/app.css" />
+</head>
+
+<body>
+
+  <!-- Navigation (rendered dynamically based on role) -->
+  <div id="app-nav"></div>
+
+  <!-- SPA Content Container -->
+  <div id="app-content"></div>
+
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
+  <!-- ── Scripts ──────────────────────────────────────────────── -->
+  <script src="js/constants.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/router.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/demo-data.js"></script>
+  <script src="js/components/shared.js"></script>
+  <script src="js/components/hospital.js"></script>
+  <script src="js/components/tpa.js"></script>
+  <script src="js/components/finance.js"></script>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════════
+    // NormClaim — Application Bootstrap
+    // ═══════════════════════════════════════════════════════════════
+
+    // ── Toast helper (global) ──────────────────────────────────────
+    function showToast(msg, type = 'info') {
+      const icons = { success: '✓', error: '✕', info: 'ℹ', warning: '⚠' };
+      const c = document.getElementById('toast-container');
+      const t = document.createElement('div');
+      t.className = `toast ${type}`;
+      t.innerHTML = `<span>${icons[type] || 'ℹ'}</span><span>${msg}</span>`;
+      c.appendChild(t);
+      setTimeout(() => { t.classList.add('removing'); setTimeout(() => t.remove(), 300); }, 4000);
+    }
+
+    // ── Render Navbar ──────────────────────────────────────────────
+    function renderNav() {
+      document.getElementById('app-nav').innerHTML = SharedComponents.Navbar();
+    }
+
+    AuthStore.subscribe(() => { renderNav(); Router._resolve(); });
+
+    // ── Login Page ─────────────────────────────────────────────────
+    function LoginPage() {
+      if (AuthStore.isLoggedIn()) {
+        const r = AuthStore.getRole();
+        if (r === ROLES.HOSPITAL) { Router.navigate('portal/cases'); return ''; }
+        if (r === ROLES.TPA) { Router.navigate('tpa/queue'); return ''; }
+        if (r === ROLES.FINANCE) { Router.navigate('finance/alerts'); return ''; }
+      }
+      return `
+    <div class="login-page">
+      <div class="login-container animate-in">
+        <div class="login-brand">
+          <div class="nav-logo-mark" style="width:56px;height:56px;font-size:1.8rem;border-radius:var(--r-md);margin-bottom:var(--sp-5);">N</div>
+          <h1 style="font-size:2.2rem;margin-bottom:var(--sp-2);">Norm<span style="color:var(--teal-bright)">Claim</span></h1>
+          <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:var(--sp-8);">TPA & Hospital Claims Management System</p>
+        </div>
+        <div class="login-roles">
+          <h4 style="text-align:center;margin-bottom:var(--sp-6);color:var(--text-muted);">Select your role to continue</h4>
+          <div class="role-cards">
+            <button class="role-card" onclick="loginAs('HOSPITAL')">
+              <div class="role-icon" style="background:var(--teal-faint);color:var(--teal-bright);">🏥</div>
+              <div class="role-name">Hospital Portal</div>
+              <div class="role-desc">Submit pre-auth, track claims, upload documents</div>
+              <div class="role-stages"><span class="badge badge-teal">All 11 stages</span></div>
+            </button>
+            <button class="role-card" onclick="loginAs('TPA')">
+              <div class="role-icon" style="background:var(--gold-faint);color:var(--gold);">📋</div>
+              <div class="role-name">TPA Dashboard</div>
+              <div class="role-desc">Review, approve, settle — full claim lifecycle</div>
+              <div class="role-stages"><span class="badge badge-gold">All 11 stages</span></div>
+            </button>
+            <button class="role-card" onclick="loginAs('FINANCE')">
+              <div class="role-icon" style="background:var(--green-faint);color:var(--green);">💰</div>
+              <div class="role-name">Finance Panel</div>
+              <div class="role-desc">Ledger entries, UTR tracking, reconciliation</div>
+              <div class="role-stages"><span class="badge badge-green">Stages 9–11</span></div>
+            </button>
+          </div>
+        </div>
+        <div class="login-footer">
+          <span class="badge badge-muted">Pre-Auth → Settlement · 11-Stage Workflow</span>
+        </div>
+      </div>
+    </div>`;
+    }
+
+    function loginAs(role) {
+      const names = { HOSPITAL: 'Dr. Mehta', TPA: 'Rahul Sharma', FINANCE: 'Anita Kapoor' };
+      AuthStore.login({ role, name: names[role], hospitalId: 'HSP-CITY-01', tpaOfficerId: 'TPA-001', financeUserId: 'FIN-001' });
+      showToast(`Logged in as ${ROLE_META[role].label}`, 'success');
+    }
+
+    // ── Register Routes ────────────────────────────────────────────
+    // Login
+    Router.register('login', LoginPage);
+
+    // Hospital Portal
+    Router.register('portal/cases', () => HospitalComponents.CasesDashboard(), { roles: [ROLES.HOSPITAL] });
+    Router.register('portal/pre-auth/new', () => HospitalComponents.PreAuthForm(), { roles: [ROLES.HOSPITAL] });
+    Router.register('portal/claim/:claimId', (p) => HospitalComponents.ClaimDetail(p), { roles: [ROLES.HOSPITAL] });
+    Router.register('portal/pre-auth/:claimId', (p) => HospitalComponents.ClaimDetail(p), { roles: [ROLES.HOSPITAL] });
+    Router.register('portal/admission/:claimId', (p) => HospitalComponents.ClaimDetail(p), { roles: [ROLES.HOSPITAL] });
+    Router.register('portal/enhancement/:claimId', (p) => HospitalComponents.ClaimDetail(p), { roles: [ROLES.HOSPITAL] });
+    Router.register('portal/discharge/:claimId', (p) => HospitalComponents.ClaimDetail(p), { roles: [ROLES.HOSPITAL] });
+    Router.register('portal/settlement/:claimId', (p) => HospitalComponents.ClaimDetail(p), { roles: [ROLES.HOSPITAL] });
+
+    // TPA Dashboard
+    Router.register('tpa/queue', () => TPAComponents.PreAuthQueue(), { roles: [ROLES.TPA] });
+    Router.register('tpa/review/:claimId', (p) => TPAComponents.ReviewDecisionPanel(p), { roles: [ROLES.TPA] });
+    Router.register('tpa/discharge/:claimId', (p) => TPAComponents.DischargeApprovalPanel(p), { roles: [ROLES.TPA] });
+    Router.register('tpa/cases', () => TPAComponents.AllCases(), { roles: [ROLES.TPA] });
+
+    // Finance Panel
+    Router.register('finance/alerts', () => FinanceComponents.Alerts(), { roles: [ROLES.FINANCE] });
+    Router.register('finance/ledger/entry/:claimId', (p) => FinanceComponents.LedgerEntryForm(p), { roles: [ROLES.FINANCE] });
+    Router.register('finance/ledger/entry', () => FinanceComponents.LedgerEntryForm({}), { roles: [ROLES.FINANCE] });
+    Router.register('finance/reconciliation', () => FinanceComponents.ReconciliationView(), { roles: [ROLES.FINANCE] });
+
+    // ── Initialize ─────────────────────────────────────────────────
+    renderNav();
+    Router.init('app-content');
+
+    // Try WebSocket connection
+    SocketManager.connect();
+
+    // Default route
+    if (!window.location.hash || window.location.hash === '#/') {
+      if (AuthStore.isLoggedIn()) {
+        const r = AuthStore.getRole();
+        if (r === ROLES.HOSPITAL) Router.navigate('portal/cases');
+        else if (r === ROLES.TPA) Router.navigate('tpa/queue');
+        else Router.navigate('finance/alerts');
+      } else {
+        Router.navigate('login');
+      }
+    }
+  </script>
+</body>
+
+</html>
