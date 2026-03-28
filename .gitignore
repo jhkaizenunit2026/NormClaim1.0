@@ -1,0 +1,59 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+.eggs/
+/backend/build/
+backend/build/
+backend/dist/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Android / Gradle (paths under android/)
+android/.gradle/
+android/**/build/
+android/local.properties
+android/captures/
+android/.externalNativeBuild/
+android/.cxx/
+android/**/*.iml
+
+# Java / Maven (fhir-service)
+fhir-service/target/
+hs_err_pid*
+
+# Docker
+*.log
+
+# Large local datasets and archives
+DataSet/**/*.7z
+DataSet/**/*.zip
+DataSet/**/.DS_Store
+
+# Editors
+.idea/
+*.swp
+*.swo
+*~
