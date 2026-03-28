@@ -8,6 +8,9 @@ import uuid
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
+from models.database import SessionLocal
+from services.persistence import save_document, row_has_extraction, row_has_report
+
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
 
 # In-memory store (imported from main app state)
@@ -43,6 +46,13 @@ async def upload_document(file: UploadFile = File(...)):
         "size": len(file_bytes),
         "bytes": file_bytes,
     }
+
+    storage_key = f"{doc_id}/{file.filename}"
+    try:
+        with SessionLocal() as db:
+            save_document(db, doc_id, file.filename, file_bytes, storage_key)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Local database error: {str(e)}")
 
     # Upload file to Supabase Storage (best-effort if configured)
     if supabase is not None:
@@ -85,8 +95,8 @@ async def list_documents():
                     "document_id": r["id"],
                     "filename": r["filename"],
                     "size_bytes": DOCUMENTS.get(r["id"], {}).get("size"),
-                    "has_extraction": r["id"] in EXTRACTIONS,
-                    "has_report": r["id"] in REPORTS,
+                    "has_extraction": r["id"] in EXTRACTIONS or row_has_extraction(r["id"]),
+                    "has_report": r["id"] in REPORTS or row_has_report(r["id"]),
                 }
                 for r in rows
             ]
@@ -98,8 +108,8 @@ async def list_documents():
             "document_id": k,
             "filename": v["filename"],
             "size_bytes": v["size"],
-            "has_extraction": k in EXTRACTIONS,
-            "has_report": k in REPORTS,
+            "has_extraction": k in EXTRACTIONS or row_has_extraction(k),
+            "has_report": k in REPORTS or row_has_report(k),
         }
         for k, v in DOCUMENTS.items()
     ]

@@ -11,6 +11,7 @@ import json
 import re
 import time
 import logging
+from pathlib import Path
 from typing import Dict, List
 
 import google.generativeai as genai
@@ -120,6 +121,34 @@ def _call_gemini_with_retry(model: genai.GenerativeModel, prompt_text: str) -> D
 
 
 def extract_from_document(file_bytes: bytes, document_id: str) -> ExtractionResult:
+    if os.getenv("USE_DEMO_CACHE", "false").lower() == "true":
+        cache_path = Path(__file__).resolve().parent.parent.parent / "test-data" / "cached_extraction.json"
+        if cache_path.is_file():
+            with open(cache_path, encoding="utf-8") as f:
+                data = json.load(f)
+            data["document_id"] = document_id
+            if isinstance(data.get("section_map"), dict):
+                data["section_map"] = {str(k): v for k, v in data["section_map"].items()}
+            medications = []
+            for m in data.get("medications", []):
+                med = dict(m)
+                med.setdefault("name", med.get("generic_name") or med.get("brand_name"))
+                medications.append(Medication(**med))
+            return ExtractionResult(
+                document_id=document_id,
+                patient=PatientInfo(**data.get("patient", {})),
+                encounter=EncounterInfo(**data.get("encounter", {})),
+                diagnoses=[Diagnosis(**d) for d in data.get("diagnoses", [])],
+                procedures=[Procedure(**p) for p in data.get("procedures", [])],
+                medications=medications,
+                billed_codes=data.get("billed_codes", []),
+                raw_text_preview=(data.get("raw_text_preview") or "")[:500],
+                detected_script=data.get("detected_script"),
+                section_map=data.get("section_map") or {},
+                negated_spans=data.get("negated_spans") or [],
+                low_confidence_flags=data.get("low_confidence_flags", []),
+            )
+
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         raise ValueError("GEMINI_API_KEY environment variable is not set")

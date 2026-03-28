@@ -7,22 +7,18 @@ import spacy
 import json
 import re
 import os
-import importlib
 from typing import List, Dict
 
-_medspacy_context = None
+# medspaCy 1.x registers the "medspacy_context" factory on import.
+MEDSPACY_AVAILABLE = False
 try:
-    _medspacy_context = importlib.import_module("medspacy.context")
+    import medspacy.context  # noqa: F401 — registers @Language.factory("medspacy_context")
+
+    nlp = spacy.load("en_core_web_sm")
+    nlp.add_pipe("medspacy_context", last=True)
+    MEDSPACY_AVAILABLE = True
 except Exception:
-    _medspacy_context = None
-
-MEDSPACY_AVAILABLE = _medspacy_context is not None
-
-# Load spaCy model
-nlp = spacy.load("en_core_web_sm")
-if MEDSPACY_AVAILABLE:
-    context = _medspacy_context.ConTextComponent()
-    nlp.add_pipe(context, last=True)
+    nlp = spacy.load("en_core_web_sm")
 
 # Load abbreviation map
 _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")

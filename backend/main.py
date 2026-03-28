@@ -112,6 +112,14 @@ async def startup_event():
     fhir_url = os.environ.get("FHIR_SERVICE_URL", "http://localhost:8001/fhir/bundle")
     logger.info(f"✓  FHIR service URL: {fhir_url}")
     logger.info("✓  API docs available at: http://localhost:8000/docs")
+
+    from services.persistence import bootstrap_memory_caches
+
+    try:
+        bootstrap_memory_caches()
+    except Exception as e:
+        logger.warning("SQLite bootstrap skipped or failed: %s", e)
+
     logger.info("=" * 60)
 
 

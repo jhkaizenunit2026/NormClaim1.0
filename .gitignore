@@ -9,6 +9,13 @@
 .env.*.local
 *.pem
 
+# Local SQLite (NormClaim persistence)
+normclaim.db
+**/normclaim.db
+
+# Smoke script outputs
+test-data/.smoke_*.json
+
 # Python
 __pycache__/
 *.py[cod]

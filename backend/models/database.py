@@ -3,7 +3,7 @@ NormClaim — Database Setup
 SQLAlchemy SQLite setup for persistent document tracking.
 """
 
-from sqlalchemy import create_engine, Column, String, DateTime, Boolean, Float, Integer, Text
+from sqlalchemy import create_engine, Column, String, DateTime, Boolean, Float, Integer, Text, LargeBinary
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
@@ -24,6 +24,10 @@ class DocumentRecord(Base):
     has_extraction = Column(Boolean, default=False)
     has_report = Column(Boolean, default=False)
     file_size_bytes = Column(Integer, nullable=True)
+    # Persisted PDF bytes for restart-safe extraction (optional for legacy rows).
+    file_blob = Column(LargeBinary, nullable=True)
+    # Object key within Supabase Storage bucket `documents` (e.g. "{doc_id}/file.pdf").
+    storage_key = Column(String(1024), nullable=True)
 
 
 class ExtractionRecord(Base):
@@ -40,6 +44,14 @@ class ReportRecord(Base):
     document_id = Column(String, primary_key=True, index=True)
     report_json = Column(Text, nullable=False)
     claim_delta_inr = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class FhirBundleRecord(Base):
+    __tablename__ = "fhir_bundles"
+
+    document_id = Column(String, primary_key=True, index=True)
+    bundle_json = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

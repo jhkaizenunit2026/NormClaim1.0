@@ -131,7 +131,7 @@ public class BundleBuilderService {
     Encounter enc = new Encounter();
     enc.setId(id);
     enc.setStatus(Encounter.EncounterStatus.FINISHED);
-    Encounter.EncounterClassComponent cc = new Encounter.EncounterClassComponent();
+    Coding cc = new Coding();
     cc.setSystem("http://terminology.hl7.org/CodeSystem/v3-ActCode");
     cc.setCode("IMP");
     cc.setDisplay("inpatient encounter");

@@ -14,10 +14,23 @@ router = APIRouter(prefix="/api/extract", tags=["Extraction"])
 EXTRACTIONS: dict = {}
 
 
+def _ensure_extraction_loaded(document_id: str) -> None:
+    from services.persistence import load_extraction_result
+
+    if document_id in EXTRACTIONS:
+        return
+    ex = load_extraction_result(document_id)
+    if ex:
+        EXTRACTIONS[document_id] = ex
+
+
 @router.post("/{document_id}", response_model=ExtractionResult)
 async def extract_document(document_id: str):
     """Run NLP extraction on an uploaded document."""
-    if document_id not in DOCUMENTS:
+    from services.persistence import hydrate_document_for_extract, save_extraction_result
+    from models.database import SessionLocal
+
+    if not hydrate_document_for_extract(document_id):
         raise HTTPException(status_code=404, detail="Document not found")
 
     file_bytes = DOCUMENTS[document_id].get("bytes")
@@ -30,12 +43,18 @@ async def extract_document(document_id: str):
         raise HTTPException(status_code=500, detail=f"Extraction error: {str(e)}")
 
     EXTRACTIONS[document_id] = extraction_result
+    try:
+        with SessionLocal() as db:
+            save_extraction_result(db, extraction_result)
+    except Exception:
+        pass
     return extraction_result
 
 
 @router.get("/{document_id}", response_model=ExtractionResult)
 async def get_extraction(document_id: str):
     """Retrieve a previous extraction result."""
+    _ensure_extraction_loaded(document_id)
     if document_id not in EXTRACTIONS:
         raise HTTPException(status_code=404, detail="Not extracted yet")
     return EXTRACTIONS[document_id]

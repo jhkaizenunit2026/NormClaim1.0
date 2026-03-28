@@ -14,13 +14,24 @@ router = APIRouter(prefix="/api/fhir", tags=["FHIR"])
 FHIR_BUNDLES: dict = {}
 
 
+def _ensure_extraction_for_fhir(document_id: str) -> None:
+    from services.persistence import load_extraction_result
+
+    if document_id in EXTRACTIONS:
+        return
+    ex = load_extraction_result(document_id)
+    if ex:
+        EXTRACTIONS[document_id] = ex
+
+
 @router.post("/{document_id}")
 async def create_fhir_bundle(document_id: str):
     """Generate a FHIR R4 Bundle from extraction results."""
+    _ensure_extraction_for_fhir(document_id)
     if document_id not in EXTRACTIONS:
         raise HTTPException(
             status_code=404,
-            detail="Extract first: POST /api/extract/{id}"
+            detail="Extract first: POST /api/extract/{id}",
         )
 
     extraction = EXTRACTIONS[document_id]
@@ -38,6 +49,12 @@ async def create_fhir_bundle(document_id: str):
         bundle.setdefault("meta", {})["tag"] = [{"code": "local-fallback"}]
 
     FHIR_BUNDLES[document_id] = bundle
+    from services.persistence import save_fhir_bundle_db
+
+    try:
+        save_fhir_bundle_db(document_id, bundle)
+    except Exception:
+        pass
     return bundle
 
 
@@ -45,5 +62,11 @@ async def create_fhir_bundle(document_id: str):
 async def get_fhir_bundle(document_id: str):
     """Retrieve a previously generated FHIR bundle."""
     if document_id not in FHIR_BUNDLES:
-        raise HTTPException(status_code=404, detail="No FHIR bundle found")
+        from services.persistence import load_fhir_bundle_db
+
+        bundle = load_fhir_bundle_db(document_id)
+        if bundle:
+            FHIR_BUNDLES[document_id] = bundle
+        else:
+            raise HTTPException(status_code=404, detail="No FHIR bundle found")
     return FHIR_BUNDLES[document_id]

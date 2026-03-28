@@ -7,6 +7,23 @@
 
 ---
 
+## Current status (2026-03-28) vs earlier audit claims
+
+Several items described as broken in older audits (including parts of `NormClaim_Full_Audit_And_Solutions.md`) have since been addressed in this repo:
+
+| Earlier claim | Current state |
+|----------------|----------------|
+| Gemini extraction not wired | `POST /api/extract/{id}` runs `extract_from_document` in `services/extractor.py`. |
+| `DOCUMENTS` never populated | Upload stores bytes in memory and persists metadata + PDF blob to SQLite (`services/persistence.py`). |
+| Startup requires Supabase | Supabase is optional; missing credentials log a warning. |
+| FHIR always 503 | `POST /api/fhir/{id}` falls back to `services/fhir_mapper.py` when the Java service is down; optional Java service lives in `fhir-service/`. |
+| No dashboard / docker | `web-dashboard/` and `docker-compose.yml` exist. |
+| No persistence | Extractions, reconciliation reports, and FHIR bundles are stored in SQLite (`normclaim.db` under the backend working directory) and reloaded on startup; PDF bytes can be restored from SQLite or downloaded from Supabase Storage when `storage_key` is set. |
+
+Use [`.env.example`](.env.example) for required variables. Run [`scripts/smoke_api.sh`](scripts/smoke_api.sh) against a live backend for an end-to-end check.
+
+---
+
 ## 1. What Has Been Built
 
 ### ✅ Backend Skeleton (FastAPI)
