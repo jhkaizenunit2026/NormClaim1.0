@@ -48,9 +48,11 @@ hs_err_pid*
 *.log
 
 # Large local datasets and archives
+DataSet/
 DataSet/**/*.7z
 DataSet/**/*.zip
 DataSet/**/.DS_Store
+data_extraction_scripts/
 
 # Editors
 .idea/
