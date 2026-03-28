@@ -17,8 +17,8 @@
   <!-- Animated beams background (built bundle: npm run build in web-dashboard) -->
   <div id="beams-root" aria-hidden="true"></div>
 
-  <!-- Navigation (rendered dynamically based on role) -->
-  <div id="app-nav"></div>
+  <!-- Navigation (rendered dynamically; glass tab shell from SharedComponents.Navbar) -->
+  <header id="app-nav" class="app-nav-anchor"></header>
 
   <!-- SPA Content Container -->
   <div id="app-content"></div>
@@ -75,7 +75,6 @@
     <div class="login-page">
       <div class="login-container animate-in">
         <div class="login-brand">
-          <div class="nav-logo-mark" style="width:56px;height:56px;font-size:1.8rem;border-radius:var(--r-md);margin-bottom:var(--sp-5);">N</div>
           <h1 style="font-size:2.2rem;margin-bottom:var(--sp-2);">Norm<span style="color:var(--teal-bright)">Claim</span></h1>
           <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:var(--sp-8);">TPA & Hospital Claims Management System</p>
         </div>

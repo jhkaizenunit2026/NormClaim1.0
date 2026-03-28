@@ -192,20 +192,22 @@ const SharedComponents = {
     `;
 
     return `
-    <nav class="nav">
-      <a href="#/login" class="nav-logo">
-        <div class="nav-logo-mark">N</div>
-        <span class="nav-logo-text">Norm<span>Claim</span></span>
-      </a>
-      <div class="nav-links">${links}</div>
-      <div class="nav-spacer"></div>
-      ${user ? `
-        <div class="nav-notif-wrap">${SharedComponents.NotificationBell()}</div>
-        <span class="nav-badge">${roleMeta?.icon || ''} ${roleMeta?.label || role}</span>
-        <button class="btn btn-ghost btn-sm" onclick="AuthStore.logout()">
-          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-        </button>
-      ` : '<span class="nav-badge">Sign In</span>'}
-    </nav>`;
+    <div class="nav-glass-shell" id="app-nav-inner">
+      <nav class="nav nav-glass" aria-label="Main">
+        <a href="#/login" class="nav-logo">
+          <div class="nav-logo-mark">N</div>
+          <span class="nav-logo-text">Norm<span>Claim</span></span>
+        </a>
+        <div class="nav-links">${links}</div>
+        <div class="nav-spacer"></div>
+        ${user ? `
+          <div class="nav-notif-wrap">${SharedComponents.NotificationBell()}</div>
+          <span class="nav-badge">${roleMeta?.icon || ''} ${roleMeta?.label || role}</span>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="AuthStore.logout()" aria-label="Log out">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          </button>
+        ` : '<span class="nav-badge">Sign In</span>'}
+      </nav>
+    </div>`;
   }
 };
