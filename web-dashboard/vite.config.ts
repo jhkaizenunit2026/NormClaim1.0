@@ -18,12 +18,14 @@ export default defineConfig({
       input: {
         beams: path.resolve(__dirname, "src/beams-mount.tsx"),
         statcards: path.resolve(__dirname, "src/stat-cards-mount.tsx"),
+        auth: path.resolve(__dirname, "src/auth-mount.tsx"),
       },
       output: {
         inlineDynamicImports: false,
         entryFileNames: (chunkInfo) => {
           if (chunkInfo.name === "beams") return "beams-bg.js";
           if (chunkInfo.name === "statcards") return "stat-cards.js";
+          if (chunkInfo.name === "auth") return "auth-overlay.js";
           return "[name].js";
         },
         assetFileNames: "[name][extname]",

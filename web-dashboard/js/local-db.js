@@ -35,8 +35,8 @@ const LocalDB = {
     if (!email || !password || !name || !role) {
       throw new Error('All fields are required.');
     }
-    if (password.length < 6) {
-      throw new Error('Password must be at least 6 characters.');
+    if (password.length < 8) {
+      throw new Error('Password must be at least 8 characters.');
     }
     if (!['HOSPITAL', 'TPA', 'FINANCE'].includes(role)) {
       throw new Error('Invalid role selected.');

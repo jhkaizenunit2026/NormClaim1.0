@@ -82,3 +82,9 @@ const AuthStore = {
 };
 
 AuthStore.init();
+
+// Bridge for React auth overlay (auth-overlay.js) and tooling
+window.NormClaimAuthBridge = {
+  login: (args) => AuthStore.login(args),
+  signUp: (args) => AuthStore.signUp(args),
+};
