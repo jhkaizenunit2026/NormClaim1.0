@@ -1,5 +1,6 @@
 """
-SQLite persistence for documents, extractions, reconciliation reports, and FHIR bundles.
+Persistence layer for documents, extractions, reconciliation reports, and FHIR bundles.
+Backs onto Supabase PostgreSQL (or local SQLite as fallback).
 Hydrates in-memory router caches on startup and on demand (Supabase re-download).
 """
 
@@ -27,16 +28,18 @@ logger = logging.getLogger(__name__)
 
 
 def _migrate_schema() -> None:
-    """Add columns / tables for existing SQLite files created before new fields."""
+    """Ensure all expected columns exist (safe for both PostgreSQL and SQLite)."""
     Base.metadata.create_all(bind=engine)
     insp = inspect(engine)
     tables = insp.get_table_names()
     if "documents" not in tables:
         return
     cols = {c["name"] for c in insp.get_columns("documents")}
+    is_pg = engine.dialect.name == "postgresql"
     with engine.begin() as conn:
         if "file_blob" not in cols:
-            conn.execute(text("ALTER TABLE documents ADD COLUMN file_blob BLOB"))
+            blob_type = "BYTEA" if is_pg else "BLOB"
+            conn.execute(text(f"ALTER TABLE documents ADD COLUMN file_blob {blob_type}"))
         if "storage_key" not in cols:
             conn.execute(text("ALTER TABLE documents ADD COLUMN storage_key VARCHAR(1024)"))
 
