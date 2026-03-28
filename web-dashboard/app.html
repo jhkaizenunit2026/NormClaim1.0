@@ -9,9 +9,13 @@
     content="11-stage TPA and Hospital Claims Management System — Pre-Auth to Settlement workflow with role-based access." />
   <link rel="stylesheet" href="assets/style.css" />
   <link rel="stylesheet" href="assets/app.css" />
+  <link rel="stylesheet" href="assets/beams-bg.css" />
 </head>
 
 <body>
+
+  <!-- Animated beams background (built bundle: npm run build in web-dashboard) -->
+  <div id="beams-root" aria-hidden="true"></div>
 
   <!-- Navigation (rendered dynamically based on role) -->
   <div id="app-nav"></div>
@@ -165,6 +169,7 @@
       }
     }
   </script>
+  <script type="module" src="assets/beams-bg.js"></script>
 </body>
 
 </html>

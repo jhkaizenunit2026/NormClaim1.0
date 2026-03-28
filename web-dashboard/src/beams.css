@@ -1,0 +1,2 @@
+/* Utilities only — avoid Tailwind preflight overriding legacy dashboard CSS */
+@tailwind utilities;

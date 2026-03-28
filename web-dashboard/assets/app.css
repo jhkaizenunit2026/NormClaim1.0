@@ -497,3 +497,22 @@
   .login-page { padding: var(--sp-4); }
   .stage-progress-bar { gap: 0; }
 }
+
+/* ─── React beams background mount ─────────────────────────── */
+#beams-root {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+#app-nav,
+#app-content {
+  position: relative;
+  z-index: 1;
+}
+
+#toast-container {
+  position: relative;
+  z-index: 200;
+}
