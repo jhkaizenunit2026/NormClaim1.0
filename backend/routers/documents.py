@@ -76,6 +76,21 @@ async def upload_document(
     doc_id = str(uuid.uuid4())
     filename = file.filename or "upload.pdf"
     uploaded_at = datetime.now(timezone.utc)
+    storage_key = f"{doc_id}/{filename}"
+
+    # Supabase Storage is mandatory for demo/persistence source-of-truth.
+    try:
+        from main import supabase_admin as sb_client
+    except Exception:
+        sb_client = None
+    if sb_client is None:
+        raise HTTPException(status_code=503, detail="Supabase storage client is not configured")
+
+    try:
+        sb_client.storage.from_("documents").upload(storage_key, file_bytes)
+    except Exception as e:
+        logger.error("Supabase Storage upload failed: %s", e)
+        raise HTTPException(status_code=502, detail="Document storage upload failed")
 
     # Keep bytes in memory for downstream routes (/extract etc.)
     DOCUMENTS[doc_id] = {
@@ -85,7 +100,6 @@ async def upload_document(
     }
 
     # Persist to database
-    storage_key = f"{doc_id}/{filename}"
     try:
         with SessionLocal() as db:
             save_document_with_consent(
@@ -99,14 +113,6 @@ async def upload_document(
     except Exception as e:
         logger.error("Database error during upload: %s", e)
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-
-    # ── 7. Optional Supabase Storage upload ────────────────────────────
-    try:
-        from main import supabase as sb_client
-        if sb_client is not None:
-            sb_client.storage.from_("documents").upload(storage_key, file_bytes)
-    except Exception as e:
-        logger.warning("Supabase Storage upload failed (non-fatal): %s", e)
 
     return DocumentUploadResponse(
         document_id=doc_id,

@@ -14,7 +14,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List
 
-import google.generativeai as genai
+from google import genai
 from rapidfuzz import process, fuzz
 
 from models.schemas import (
@@ -102,15 +102,37 @@ def _parse_json(raw: str) -> Dict:
         return json.loads(match.group())
 
 
-def _call_gemini_with_retry(model: genai.GenerativeModel, prompt_text: str) -> Dict:
+def _extract_response_text(response: object) -> str:
+    """Extract text from google-genai response objects across SDK variants."""
+    text = getattr(response, "text", None)
+    if text:
+        return str(text).strip()
+
+    candidates = getattr(response, "candidates", None) or []
+    chunks: List[str] = []
+    for candidate in candidates:
+        content = getattr(candidate, "content", None)
+        parts = getattr(content, "parts", None) or []
+        for part in parts:
+            part_text = getattr(part, "text", None)
+            if part_text:
+                chunks.append(str(part_text))
+    return "\n".join(chunks).strip()
+
+
+def _call_gemini_with_retry(client: genai.Client, prompt_text: str) -> Dict:
     last_error = None
     for attempt in range(MAX_RETRIES):
         try:
-            response = model.generate_content(
-                prompt_text,
-                generation_config={"temperature": 0.1},
+            response = client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=prompt_text,
+                config={"temperature": 0.1},
             )
-            return _parse_json((response.text or "").strip())
+            raw = _extract_response_text(response)
+            if not raw:
+                raise ValueError("Gemini returned empty response body")
+            return _parse_json(raw)
         except Exception as e:
             last_error = e
             if attempt < MAX_RETRIES - 1:
@@ -153,8 +175,7 @@ def extract_from_document(file_bytes: bytes, document_id: str) -> ExtractionResu
     if not api_key:
         raise ValueError("GEMINI_API_KEY environment variable is not set")
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel(model_name=GEMINI_MODEL)
+    client = genai.Client(api_key=api_key)
     raw_text = extract_text_from_pdf(file_bytes)
 
     if not raw_text or len(raw_text) < 100:
@@ -171,7 +192,7 @@ def extract_from_document(file_bytes: bytes, document_id: str) -> ExtractionResu
     }
     prompt_text = f"{EXTRACTION_SYSTEM_PROMPT}\n\nINPUT:\n{json.dumps(prompt_payload, ensure_ascii=False)}"
 
-    data = _call_gemini_with_retry(model, prompt_text)
+    data = _call_gemini_with_retry(client, prompt_text)
     data = apply_negation_override(data, spacy_result["negated_spans"])
     data["diagnoses"] = validate_icd10_codes(data.get("diagnoses", []))
 

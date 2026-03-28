@@ -59,6 +59,7 @@ from routers.analytics import router as analytics_router
 from routers.auth import router as auth_router
 from routers.config import router as config_router
 from routers.claims import router as claims_router
+from Extraction_pipeline.router import router as preauth_router
 
 app.include_router(documents_router)
 app.include_router(extract_router)
@@ -71,11 +72,12 @@ app.include_router(validate_router)
 app.include_router(auth_router)
 app.include_router(config_router)
 app.include_router(claims_router)
+app.include_router(preauth_router, prefix="/api/preauth", tags=["pre-auth"])
 
 
 # ── Supabase Client Setup ────────────────────────────────────────────────
-SUPABASE_URL = os.environ.get("NEXT_PUBLIC_SUPABASE_URL") or os.environ.get("SUPABASE_URL")
-SUPABASE_ANON_KEY = os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+SUPABASE_URL = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 SUPABASE_SERVICE_ROLE_KEY = (
     os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     or os.environ.get("SUPABASE_SERVICE_KEY")
@@ -88,8 +90,8 @@ supabase: Optional[Client] = None  # Backward compatibility alias for existing m
 
 if not SUPABASE_URL or not SUPABASE_ANON_KEY or not SUPABASE_SERVICE_ROLE_KEY:
     raise EnvironmentError(
-        "Supabase credentials missing. Required env vars: NEXT_PUBLIC_SUPABASE_URL, "
-        "NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY"
+        "Supabase credentials missing. Required env vars: SUPABASE_URL, "
+        "SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY"
     )
 
 supabase_auth = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -133,11 +135,19 @@ async def startup_event():
     logger.info("✓  API docs available at: http://localhost:8000/docs")
 
     from services.persistence import bootstrap_memory_caches
+    from Extraction_pipeline.database import get_supabase as get_extraction_supabase
 
     try:
         bootstrap_memory_caches()
     except Exception as e:
         logger.warning("SQLite bootstrap skipped or failed: %s", e)
+
+    try:
+        extraction_supabase = get_extraction_supabase()
+        extraction_supabase.table("pre_auth_forms").select("id").limit(1).execute()
+        logger.info("✓  Extraction pipeline readiness check passed")
+    except Exception as e:
+        logger.warning("⚠  Extraction pipeline readiness check failed: %s", e)
 
     logger.info("=" * 60)
 

@@ -30,8 +30,11 @@ async def extract_document(document_id: str):
     from services.persistence import hydrate_document_for_extract, save_extraction_result
     from models.database import SessionLocal
 
-    if not hydrate_document_for_extract(document_id):
+    hydration_state = hydrate_document_for_extract(document_id)
+    if hydration_state == "not_found":
         raise HTTPException(status_code=404, detail="Document not found")
+    if hydration_state == "bytes_missing":
+        raise HTTPException(status_code=400, detail="Document bytes missing")
 
     file_bytes = DOCUMENTS[document_id].get("bytes")
     if not file_bytes:

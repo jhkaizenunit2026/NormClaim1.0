@@ -166,7 +166,7 @@ def load_fhir_bundle_db(document_id: str) -> Optional[Dict[str, Any]]:
 def fetch_bytes_from_supabase(document_id: str) -> Optional[bytes]:
     """Download PDF bytes from Supabase Storage using persisted storage_key."""
     try:
-        from main import supabase
+        from main import supabase_admin as supabase
     except Exception:
         supabase = None
     if supabase is None:
@@ -192,17 +192,17 @@ def ensure_document_bytes(document_id: str) -> Optional[bytes]:
     return fetch_bytes_from_supabase(document_id)
 
 
-def hydrate_document_for_extract(document_id: str) -> bool:
+def hydrate_document_for_extract(document_id: str) -> str:
     """
     Ensure routers.documents.DOCUMENTS has bytes for document_id using SQLite + Supabase.
-    Returns True if bytes are available.
+    Returns one of: "ok", "not_found", "bytes_missing".
     """
     from routers.documents import DOCUMENTS
 
     with SessionLocal() as db:
         row = db.get(DocumentRecord, document_id)
     if not row:
-        return False
+        return "not_found"
     if document_id not in DOCUMENTS:
         DOCUMENTS[document_id] = {
             "filename": row.filename,
@@ -213,13 +213,13 @@ def hydrate_document_for_extract(document_id: str) -> bool:
         DOCUMENTS[document_id]["bytes"] = row.file_blob
 
     if DOCUMENTS[document_id].get("bytes"):
-        return True
+        return "ok"
 
     raw = ensure_document_bytes(document_id)
     if raw:
         DOCUMENTS[document_id]["bytes"] = raw
-        return True
-    return False
+        return "ok"
+    return "bytes_missing"
 
 
 def bootstrap_memory_caches() -> None:
@@ -228,6 +228,15 @@ def bootstrap_memory_caches() -> None:
     from routers.extract import EXTRACTIONS
     from routers.reconcile import REPORTS
     from routers.fhir import FHIR_BUNDLES
+
+    legacy_fhir_ready = False
+    try:
+        insp = inspect(engine)
+        if "fhir_bundles" in insp.get_table_names():
+            fhir_cols = {c["name"] for c in insp.get_columns("fhir_bundles")}
+            legacy_fhir_ready = {"document_id", "bundle_json"}.issubset(fhir_cols)
+    except Exception as e:
+        logger.warning("Could not inspect fhir_bundles schema during bootstrap: %s", e)
 
     with SessionLocal() as db:
         for doc in db.query(DocumentRecord).all():
@@ -248,11 +257,17 @@ def bootstrap_memory_caches() -> None:
                 REPORTS[rep.document_id] = ReconciliationReport(**data)
             except Exception as e:
                 logger.warning("Skip bad report row %s: %s", rep.document_id, e)
-        for fb in db.query(FhirBundleRecord).all():
-            try:
-                FHIR_BUNDLES[fb.document_id] = json.loads(fb.bundle_json)
-            except Exception as e:
-                logger.warning("Skip bad FHIR row %s: %s", fb.document_id, e)
+        if legacy_fhir_ready:
+            for fb in db.query(FhirBundleRecord).all():
+                try:
+                    FHIR_BUNDLES[fb.document_id] = json.loads(fb.bundle_json)
+                except Exception as e:
+                    logger.warning("Skip bad FHIR row %s: %s", fb.document_id, e)
+        else:
+            logger.warning(
+                "Skipping FHIR cache bootstrap: fhir_bundles schema does not expose legacy columns "
+                "(document_id, bundle_json)."
+            )
 
     logger.info(
         "Persistence bootstrap: documents=%s extractions=%s reports=%s fhir=%s",
