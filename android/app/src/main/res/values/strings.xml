@@ -1,5 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">NormClaim</string>
+    <string name="app_tagline">Clinical AI · FHIR R4 · ABDM</string>
     <string name="upload">Upload PDF</string>
     <string name="documents">Documents</string>
+    <string name="upload_title">Upload Document</string>
+    <string name="result_title">Analysis Results</string>
+    <string name="empty_title">No documents yet</string>
+    <string name="empty_subtitle">Tap + to upload your first discharge summary</string>
+    <string name="pick_pdf_hint">Tap to select a PDF</string>
+    <string name="pick_pdf_sub">Max 20 MB · PDF only</string>
+    <string name="consent_text">I confirm patient consent has been obtained to process this document under ABDM Digital Health guidelines and the DPDP Act 2023.</string>
+    <string name="btn_upload_begin">Upload &amp; Begin Extraction</string>
+    <string name="btn_uploading">Analysing…</string>
+    <string name="generate_fhir">Generate FHIR</string>
+    <string name="tab_diagnoses">Diagnoses</string>
+    <string name="tab_medications">Medications</string>
+    <string name="tab_reconcile">Reconcile</string>
+    <string name="stat_documents">Total Docs</string>
+    <string name="stat_diagnoses">Diagnoses Found</string>
+    <string name="stat_savings">Est. Recovery</string>
+    <string name="section_recent">Recent Documents</string>
 </resources>

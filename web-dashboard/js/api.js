@@ -2,8 +2,10 @@
 // NormClaim — API Service Layer
 // ═══════════════════════════════════════════════════════════════
 
-const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? 'http://localhost:8000' : 'http://localhost:8000';
+const API_BASE = window.NormClaimSupabase?.getApiBase?.() || (
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:8000' : 'http://localhost:8000'
+);
 
 const Api = {
   _getHeaders() {
@@ -24,7 +26,8 @@ const Api = {
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({ detail: res.statusText }));
-          throw new Error(err.detail || `HTTP ${res.status}`);
+          const detail = err?.detail || err?.message || res.statusText || `HTTP ${res.status}`;
+          throw new Error(detail);
         }
         return await res.json();
       } catch (e) {
@@ -60,11 +63,15 @@ const Api = {
   uploadDocument(claimId, file, docType) {
     const fd = new FormData();
     fd.append('file', file);
-    fd.append('type', docType);
-    return fetch(`${API_BASE}/api/claims/${claimId}/documents`, {
+    fd.append('consent_obtained', 'true');
+    return fetch(`${API_BASE}/api/documents`, {
       method: 'POST', body: fd,
       headers: { 'Authorization': `Bearer ${AuthStore.getUser()?.token}` }
-    }).then(r => r.json());
+    }).then(async r => {
+      const payload = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(payload?.detail || 'Upload failed');
+      return payload;
+    });
   },
 
   // Settlement

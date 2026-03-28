@@ -1,15 +1,18 @@
 """
 NormClaim — Database Setup
 SQLAlchemy PostgreSQL setup backed by Supabase (primary database).
+Includes consent tracking, status pipeline, and cascade deletion.
 """
 
 import os
 import logging
+import json
 from dotenv import load_dotenv
 
 from sqlalchemy import create_engine, Column, String, DateTime, Boolean, Float, Integer, Text, LargeBinary
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from datetime import datetime, timezone
+from typing import Optional, List, Dict, Any
 
 # Ensure .env is loaded (no-op if already loaded in main.py)
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env"))
@@ -51,6 +54,10 @@ class DocumentRecord(Base):
     file_blob = Column(LargeBinary, nullable=True)
     # Object key within Supabase Storage bucket `documents`
     storage_key = Column(String(1024), nullable=True)
+    # ABDM / DPDP consent tracking
+    consent_obtained = Column(Boolean, default=False)
+    # Pipeline status: uploaded → extracted → fhir_generated → reconciled
+    status = Column(String(50), default="uploaded")
 
 
 class ExtractionRecord(Base):
@@ -78,6 +85,32 @@ class FhirBundleRecord(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+class ClaimRecord(Base):
+    __tablename__ = "claims"
+
+    id = Column(String, primary_key=True, index=True)
+    patient_name = Column(String, nullable=False)
+    age = Column(Integer, nullable=True)
+    sex = Column(String, nullable=True)
+    abha_id = Column(String, nullable=True)
+    diagnosis = Column(String, nullable=False)
+    icd10_code = Column(String, nullable=True)
+    status = Column(String(64), default="PRE_AUTH_INITIATED", nullable=False)
+    pre_auth_amount = Column(Float, default=0.0)
+    admission_number = Column(String, nullable=True)
+    enhancement_amount = Column(Float, default=0.0)
+    copay = Column(Float, default=0.0)
+    deductions = Column(Float, default=0.0)
+    tpa_payable_amount = Column(Float, default=0.0)
+    final_settlement_amount = Column(Float, default=0.0)
+    tds_amount = Column(Float, default=0.0)
+    utr_number = Column(String, nullable=True)
+    discharge_approval_deadline = Column(String, nullable=True)
+    timeline_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 # Create all tables (safe to run repeatedly — ignores existing tables)
 Base.metadata.create_all(bind=engine)
 
@@ -89,3 +122,232 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+# ── Helper Functions ──────────────────────────────────────────────────────
+
+def save_document_with_consent(
+    db: Session,
+    document_id: str,
+    filename: str,
+    file_bytes: bytes,
+    consent_obtained: bool,
+    storage_key: Optional[str] = None,
+) -> None:
+    """Store document + consent flag together."""
+    row = db.get(DocumentRecord, document_id)
+    if row is None:
+        row = DocumentRecord(
+            id=document_id,
+            filename=filename,
+            file_size_bytes=len(file_bytes),
+            has_extraction=False,
+            has_report=False,
+            file_blob=file_bytes,
+            storage_key=storage_key,
+            consent_obtained=consent_obtained,
+            status="uploaded",
+        )
+        db.add(row)
+    else:
+        row.filename = filename
+        row.file_size_bytes = len(file_bytes)
+        row.file_blob = file_bytes
+        row.storage_key = storage_key
+        row.consent_obtained = consent_obtained
+    db.commit()
+
+
+def get_document_meta(db: Session, document_id: str) -> Optional[Dict[str, Any]]:
+    """Return metadata dict (id, filename, uploaded_at, status, consent_obtained) without file bytes."""
+    row = db.get(DocumentRecord, document_id)
+    if row is None:
+        return None
+    return {
+        "document_id": row.id,
+        "filename": row.filename,
+        "uploaded_at": row.upload_time.isoformat() + "Z" if row.upload_time else None,
+        "status": row.status or "uploaded",
+        "consent_obtained": row.consent_obtained or False,
+        "file_size_bytes": row.file_size_bytes,
+    }
+
+
+def list_documents(db: Session) -> List[Dict[str, Any]]:
+    """Return list of all document metadata dicts (no file bytes)."""
+    rows = db.query(DocumentRecord).order_by(DocumentRecord.upload_time.desc()).all()
+    results = []
+    for row in rows:
+        results.append({
+            "document_id": row.id,
+            "filename": row.filename,
+            "status": row.status or "uploaded",
+            "uploaded_at": row.upload_time.isoformat() + "Z" if row.upload_time else None,
+        })
+    return results
+
+
+def update_document_status(db: Session, document_id: str, status: str) -> bool:
+    """Updates pipeline stage. Returns False if document not found."""
+    row = db.get(DocumentRecord, document_id)
+    if row is None:
+        return False
+    row.status = status
+    db.commit()
+    return True
+
+
+def delete_document(db: Session, document_id: str) -> bool:
+    """
+    Delete document and all related records.
+    Deletion order (FK-safe): reports → fhir_bundles → extractions → documents.
+    Returns False if document not found.
+    """
+    row = db.get(DocumentRecord, document_id)
+    if row is None:
+        return False
+
+    # Delete downstream records first
+    report = db.get(ReportRecord, document_id)
+    if report:
+        db.delete(report)
+
+    fhir = db.get(FhirBundleRecord, document_id)
+    if fhir:
+        db.delete(fhir)
+
+    extraction = db.get(ExtractionRecord, document_id)
+    if extraction:
+        db.delete(extraction)
+
+    # Delete the document itself
+    db.delete(row)
+    db.commit()
+    return True
+
+
+def _claim_to_dict(row: ClaimRecord) -> Dict[str, Any]:
+    timeline = []
+    if row.timeline_json:
+        try:
+            timeline = json.loads(row.timeline_json)
+        except Exception:
+            timeline = []
+    return {
+        "claimId": row.id,
+        "patientName": row.patient_name,
+        "age": row.age,
+        "sex": row.sex,
+        "abhaId": row.abha_id,
+        "diagnosis": row.diagnosis,
+        "icd10Code": row.icd10_code,
+        "status": row.status,
+        "preAuthAmount": float(row.pre_auth_amount or 0.0),
+        "updatedAt": row.updated_at.isoformat() + "Z" if row.updated_at else None,
+        "createdAt": row.created_at.isoformat() + "Z" if row.created_at else None,
+        "admissionNumber": row.admission_number,
+        "enhancementAmount": float(row.enhancement_amount or 0.0),
+        "copay": float(row.copay or 0.0),
+        "deductions": float(row.deductions or 0.0),
+        "tpaPayableAmount": float(row.tpa_payable_amount or 0.0),
+        "finalSettlementAmount": float(row.final_settlement_amount or 0.0),
+        "tdsAmount": float(row.tds_amount or 0.0),
+        "utrNumber": row.utr_number,
+        "dischargeApprovalDeadline": row.discharge_approval_deadline,
+        "timeline": timeline,
+    }
+
+
+def list_claims(db: Session, status: Optional[str] = None) -> List[Dict[str, Any]]:
+    q = db.query(ClaimRecord)
+    if status:
+        q = q.filter(ClaimRecord.status == status)
+    rows = q.order_by(ClaimRecord.updated_at.desc()).all()
+    return [_claim_to_dict(row) for row in rows]
+
+
+def get_claim(db: Session, claim_id: str) -> Optional[Dict[str, Any]]:
+    row = db.get(ClaimRecord, claim_id)
+    if row is None:
+        return None
+    return _claim_to_dict(row)
+
+
+def create_claim(db: Session, claim_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    timeline = [
+        {
+            "stage": "PRE_AUTH_INITIATED",
+            "action": "Pre-auth created",
+            "actor": "Hospital",
+            "timestamp": now.isoformat() + "Z",
+        }
+    ]
+    row = ClaimRecord(
+        id=claim_id,
+        patient_name=payload["patientName"],
+        age=payload.get("age"),
+        sex=payload.get("sex"),
+        abha_id=payload.get("abhaId"),
+        diagnosis=payload["diagnosis"],
+        icd10_code=payload.get("icd10Code"),
+        status="PRE_AUTH_INITIATED",
+        pre_auth_amount=float(payload.get("estimatedAmount") or 0.0),
+        timeline_json=json.dumps(timeline),
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _claim_to_dict(row)
+
+
+def update_claim_status(db: Session, claim_id: str, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    row = db.get(ClaimRecord, claim_id)
+    if row is None:
+        return None
+
+    row.status = payload.get("status", row.status)
+    if payload.get("amount") is not None:
+        row.pre_auth_amount = float(payload["amount"])
+    if payload.get("enhancementAmount") is not None:
+        row.enhancement_amount = float(payload["enhancementAmount"])
+    if payload.get("copay") is not None:
+        row.copay = float(payload["copay"])
+    if payload.get("deductions") is not None:
+        row.deductions = float(payload["deductions"])
+    if payload.get("tpaPayableAmount") is not None:
+        row.tpa_payable_amount = float(payload["tpaPayableAmount"])
+    if payload.get("finalSettlementAmount") is not None:
+        row.final_settlement_amount = float(payload["finalSettlementAmount"])
+    if payload.get("tdsAmount") is not None:
+        row.tds_amount = float(payload["tdsAmount"])
+    if payload.get("utrNumber") is not None:
+        row.utr_number = payload["utrNumber"]
+    if payload.get("admissionNumber") is not None:
+        row.admission_number = payload["admissionNumber"]
+    if payload.get("dischargeApprovalDeadline") is not None:
+        row.discharge_approval_deadline = payload["dischargeApprovalDeadline"]
+
+    timeline = []
+    if row.timeline_json:
+        try:
+            timeline = json.loads(row.timeline_json)
+        except Exception:
+            timeline = []
+
+    timeline.append(
+        {
+            "stage": row.status,
+            "action": f"Status updated to {row.status}",
+            "actor": "System",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+        }
+    )
+    row.timeline_json = json.dumps(timeline)
+    row.updated_at = datetime.now(timezone.utc)
+
+    db.commit()
+    db.refresh(row)
+    return _claim_to_dict(row)

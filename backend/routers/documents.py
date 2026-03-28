@@ -1,115 +1,199 @@
 """
-NormClaim — Documents Router
-Handles PDF upload and document listing.
+NormClaim — Documents Router (v2)
+Handles PDF upload with ABDM consent, document listing, metadata, and deletion.
+All storage backed by SQLAlchemy (Supabase PostgreSQL or SQLite).
 """
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
 import uuid
-from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
+import logging
+from datetime import datetime, timezone
 
-from models.database import SessionLocal
-from services.persistence import save_document, row_has_extraction, row_has_report
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+
+from models.database import (
+    SessionLocal,
+    save_document_with_consent,
+    get_document_meta,
+    list_documents as db_list_documents,
+    delete_document as db_delete_document,
+)
+from models.schemas import DocumentUploadResponse, DocumentMeta, DocumentListResponse
+from services.auth import require_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
 
-# In-memory store (imported from main app state)
-# These references are set by main.py at startup
+# In-memory store (populated by persistence.bootstrap_memory_caches on startup)
 DOCUMENTS: dict = {}
 
-def _get_supabase_client():
-    try:
-        from main import supabase  # Local import avoids circular import at module load.
-        return supabase
-    except Exception:
-        return None
+# Maximum upload size: 20 MB
+MAX_FILE_SIZE = 20 * 1024 * 1024  # 20_971_520 bytes
 
-@router.post("", response_model=dict)
-async def upload_document(file: UploadFile = File(...)):
-    """Upload a PDF document to Supabase Storage. Returns document_id."""
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files supported")
 
-    # Generate unique document ID
-    doc_id = str(uuid.uuid4())
+@router.post("", response_model=DocumentUploadResponse)
+async def upload_document(
+    file: UploadFile = File(...),
+    consent_obtained: bool = Form(False),
+    _: dict = Depends(require_user),
+):
+    """
+    Upload a PDF document with ABDM consent.
+    Validates PDF type, magic bytes, size, and consent flag.
+    """
+    # ── 1. Consent check (ABDM / DPDP Act mandate) ─────────────────────
+    if not consent_obtained:
+        raise HTTPException(
+            status_code=400,
+            detail="Patient consent is required under ABDM/DPDP Act before processing clinical documents.",
+        )
+
+    # ── 2. Content-type check ───────────────────────────────────────────
+    if file.content_type != "application/pdf":
+        raise HTTPException(
+            status_code=415,
+            detail="Only PDF files are accepted.",
+        )
+
+    # ── 3. Read file bytes ──────────────────────────────────────────────
     file_bytes = await file.read()
 
-    if not file_bytes:
-        raise HTTPException(status_code=400, detail="Empty file uploaded")
+    # ── 4. Size check ──────────────────────────────────────────────────
+    if len(file_bytes) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail="File too large. Maximum size is 20MB.",
+        )
 
-    storage_path = f"documents/{doc_id}/{file.filename}"
-    supabase = _get_supabase_client()
+    # ── 5. Magic bytes check (must start with %PDF) ────────────────────
+    if not file_bytes[:4] == b"%PDF":
+        raise HTTPException(
+            status_code=415,
+            detail="Only PDF files are accepted.",
+        )
 
-    # Keep in-memory bytes for extraction service.
+    # ── 6. Generate ID and persist ─────────────────────────────────────
+    doc_id = str(uuid.uuid4())
+    filename = file.filename or "upload.pdf"
+    uploaded_at = datetime.now(timezone.utc)
+
+    # Keep bytes in memory for downstream routes (/extract etc.)
     DOCUMENTS[doc_id] = {
-        "filename": file.filename,
+        "filename": filename,
         "size": len(file_bytes),
         "bytes": file_bytes,
     }
 
-    storage_key = f"{doc_id}/{file.filename}"
+    # Persist to database
+    storage_key = f"{doc_id}/{filename}"
     try:
         with SessionLocal() as db:
-            save_document(db, doc_id, file.filename, file_bytes, storage_key)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Local database error: {str(e)}")
-
-    # Upload file to Supabase Storage (best-effort if configured)
-    if supabase is not None:
-        try:
-            supabase.storage.from_("documents").upload(
-                f"{doc_id}/{file.filename}", file_bytes
+            save_document_with_consent(
+                db=db,
+                document_id=doc_id,
+                filename=filename,
+                file_bytes=file_bytes,
+                consent_obtained=True,
+                storage_key=storage_key,
             )
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Supabase Storage error: {str(e)}")
+    except Exception as e:
+        logger.error("Database error during upload: %s", e)
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    # Insert metadata into Supabase database
-    metadata = {
-        "id": doc_id,
-        "filename": file.filename,
-        "storage_path": storage_path,
-        "status": "uploaded",
-        "consent_obtained": False,
-    }
-    if supabase is not None:
-        try :
-            supabase.table("documents").insert(metadata).execute()
-        
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Supabase DB error: {str(e)}")
+    # ── 7. Optional Supabase Storage upload ────────────────────────────
+    try:
+        from main import supabase as sb_client
+        if sb_client is not None:
+            sb_client.storage.from_("documents").upload(storage_key, file_bytes)
+    except Exception as e:
+        logger.warning("Supabase Storage upload failed (non-fatal): %s", e)
 
-    return JSONResponse(content=jsonable_encoder(metadata))
+    return DocumentUploadResponse(
+        document_id=doc_id,
+        filename=filename,
+        status="uploaded",
+        consent_obtained=True,
+        uploaded_at=uploaded_at.isoformat() + "Z",
+        message="Document uploaded successfully. Ready for extraction.",
+    )
 
 
-@router.get("")
-async def list_documents():
-    """List all uploaded documents with their processing status."""
-    from routers.extract import EXTRACTIONS
-    from routers.reconcile import REPORTS
-    supabase = _get_supabase_client()
-    if supabase is not None:
-        try:
-            rows = supabase.table("documents").select("id,filename").execute().data or []
-            return [
-                {
-                    "document_id": r["id"],
-                    "filename": r["filename"],
-                    "size_bytes": DOCUMENTS.get(r["id"], {}).get("size"),
-                    "has_extraction": r["id"] in EXTRACTIONS or row_has_extraction(r["id"]),
-                    "has_report": r["id"] in REPORTS or row_has_report(r["id"]),
-                }
-                for r in rows
-            ]
-        except Exception:
-            pass
+@router.get("", response_model=DocumentListResponse)
+async def list_all_documents(_: dict = Depends(require_user)):
+    """List all uploaded documents with their pipeline status."""
+    try:
+        with SessionLocal() as db:
+            docs = db_list_documents(db)
+    except Exception as e:
+        logger.error("Database error listing documents: %s", e)
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    return [
-        {
-            "document_id": k,
-            "filename": v["filename"],
-            "size_bytes": v["size"],
-            "has_extraction": k in EXTRACTIONS or row_has_extraction(k),
-            "has_report": k in REPORTS or row_has_report(k),
-        }
-        for k, v in DOCUMENTS.items()
+    documents = [
+        DocumentMeta(
+            document_id=d["document_id"],
+            filename=d["filename"],
+            status=d["status"],
+            uploaded_at=d["uploaded_at"],
+        )
+        for d in docs
     ]
+
+    return DocumentListResponse(documents=documents, total=len(documents))
+
+
+@router.get("/{document_id}")
+async def get_document(document_id: str, _: dict = Depends(require_user)):
+    """Return metadata for a single document."""
+    try:
+        with SessionLocal() as db:
+            meta = get_document_meta(db, document_id)
+    except Exception as e:
+        logger.error("Database error fetching document %s: %s", document_id, e)
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+    if meta is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Document {document_id} not found.",
+        )
+
+    return meta
+
+
+@router.delete("/{document_id}")
+async def delete_document_endpoint(document_id: str, _: dict = Depends(require_user)):
+    """Delete document and all associated data (extractions, FHIR bundles, reconciliations)."""
+    try:
+        with SessionLocal() as db:
+            deleted = db_delete_document(db, document_id)
+    except Exception as e:
+        logger.error("Database error deleting document %s: %s", document_id, e)
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Document {document_id} not found.",
+        )
+
+    # Clean up in-memory caches
+    DOCUMENTS.pop(document_id, None)
+
+    # Clean extraction, reconciliation, fhir in-memory caches
+    try:
+        from routers.extract import EXTRACTIONS
+        EXTRACTIONS.pop(document_id, None)
+    except Exception:
+        pass
+    try:
+        from routers.reconcile import REPORTS
+        REPORTS.pop(document_id, None)
+    except Exception:
+        pass
+    try:
+        from routers.fhir import FHIR_BUNDLES
+        FHIR_BUNDLES.pop(document_id, None)
+    except Exception:
+        pass
+
+    return {"message": "Document and all associated data deleted."}

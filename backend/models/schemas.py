@@ -122,3 +122,78 @@ class AnalyticsSnapshot(BaseModel):
     extraction_accuracy_rate: float  # share of feedback marked correct
     correction_type_counts: Dict[str, int] = Field(default_factory=dict)
     data_source: str = "memory"  # "memory" | "supabase" | "hybrid"
+
+
+# ── Upload System Response Models ────────────────────────────────────────
+
+class DocumentUploadResponse(BaseModel):
+    """Response returned after successful PDF upload."""
+    document_id: str
+    filename: str
+    status: str = "uploaded"
+    consent_obtained: bool
+    uploaded_at: str
+    message: str = "Document uploaded successfully. Ready for extraction."
+
+
+class DocumentMeta(BaseModel):
+    """Metadata for a single document (no file bytes)."""
+    document_id: str
+    filename: str
+    status: str = "uploaded"
+    uploaded_at: Optional[str] = None
+
+
+class DocumentListResponse(BaseModel):
+    """Response for list-all-documents endpoint."""
+    documents: List[DocumentMeta]
+    total: int
+
+
+class ClaimCreateRequest(BaseModel):
+    patientName: str
+    age: Optional[int] = None
+    sex: Optional[str] = None
+    abhaId: Optional[str] = None
+    diagnosis: str
+    icd10Code: Optional[str] = None
+    estimatedAmount: float
+    doctor: Optional[str] = None
+
+
+class ClaimStatusUpdateRequest(BaseModel):
+    status: str
+    amount: Optional[float] = None
+    enhancementAmount: Optional[float] = None
+    copay: Optional[float] = None
+    deductions: Optional[float] = None
+    tpaPayableAmount: Optional[float] = None
+    finalSettlementAmount: Optional[float] = None
+    tdsAmount: Optional[float] = None
+    utrNumber: Optional[str] = None
+    admissionNumber: Optional[str] = None
+    dischargeApprovalDeadline: Optional[str] = None
+
+
+class ClaimResponse(BaseModel):
+    claimId: str
+    patientName: str
+    age: Optional[int] = None
+    sex: Optional[str] = None
+    abhaId: Optional[str] = None
+    diagnosis: str
+    icd10Code: Optional[str] = None
+    status: str
+    preAuthAmount: float = 0.0
+    updatedAt: Optional[str] = None
+    createdAt: Optional[str] = None
+    admissionNumber: Optional[str] = None
+    enhancementAmount: float = 0.0
+    copay: float = 0.0
+    deductions: float = 0.0
+    tpaPayableAmount: float = 0.0
+    finalSettlementAmount: float = 0.0
+    tdsAmount: float = 0.0
+    utrNumber: Optional[str] = None
+    dischargeApprovalDeadline: Optional[str] = None
+    timeline: List[Dict[str, str]] = Field(default_factory=list)

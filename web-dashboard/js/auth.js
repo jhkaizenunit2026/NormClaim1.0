@@ -6,10 +6,35 @@ const AuthStore = {
   _user: null,
   _listeners: [],
 
-  init() {
-    const saved = localStorage.getItem('nc_user');
-    if (saved) {
-      try { this._user = JSON.parse(saved); } catch(e) { this._user = null; }
+  async init() {
+    try {
+      const sb = await window.NormClaimSupabase.getClient();
+      const { data, error } = await sb.auth.getSession();
+      if (error) throw error;
+
+      const session = data?.session || null;
+      if (!session) {
+        this._user = null;
+        localStorage.removeItem('nc_user');
+        this._notify();
+        return;
+      }
+
+      const role = localStorage.getItem('nc_role') || session.user?.user_metadata?.role || ROLES.HOSPITAL;
+      this._user = {
+        id: session.user?.id,
+        email: session.user?.email,
+        name: session.user?.user_metadata?.name || session.user?.email || 'User',
+        role,
+        token: session.access_token,
+      };
+
+      localStorage.setItem('nc_user', JSON.stringify(this._user));
+      this._notify();
+    } catch (e) {
+      this._user = null;
+      localStorage.removeItem('nc_user');
+      this._notify();
     }
   },
 
@@ -17,22 +42,43 @@ const AuthStore = {
   getRole() { return this._user?.role || null; },
   isLoggedIn() { return !!this._user; },
 
-  login(userData) {
+  async login(userData) {
+    const sb = await window.NormClaimSupabase.getClient();
+    const { data, error } = await sb.auth.signInWithPassword({
+      email: userData.email,
+      password: userData.password,
+    });
+    if (error) throw error;
+
+    const session = data?.session;
+    if (!session) {
+      throw new Error('Supabase session was not created.');
+    }
+
     this._user = {
+      id: session.user?.id,
+      email: session.user?.email,
       role: userData.role,
-      name: userData.name || 'User',
-      hospitalId: userData.hospitalId || null,
-      tpaOfficerId: userData.tpaOfficerId || null,
-      financeUserId: userData.financeUserId || null,
-      token: userData.token || 'demo-token',
+      name: userData.name || session.user?.email || 'User',
+      token: session.access_token,
     };
+
+    localStorage.setItem('nc_role', userData.role);
     localStorage.setItem('nc_user', JSON.stringify(this._user));
     this._notify();
+    return this._user;
   },
 
-  logout() {
+  async logout() {
+    try {
+      const sb = await window.NormClaimSupabase.getClient();
+      await sb.auth.signOut();
+    } catch (e) {
+      // Ignore sign-out race/network errors and clear local session regardless.
+    }
     this._user = null;
     localStorage.removeItem('nc_user');
+    localStorage.removeItem('nc_role');
     this._notify();
     Router.navigate('login');
   },

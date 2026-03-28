@@ -16,7 +16,7 @@ def save_review(review: HumanReview, supabase_client: Optional[object] = None) -
     REVIEWS[review.document_id] = review
 
     if supabase_client is not None:
-        supabase_client.table("human_reviews").insert(
+        response = supabase_client.table("human_reviews").insert(
             {
                 "document_id": review.document_id,
                 "reviewer_notes": review.reviewer_notes,
@@ -24,6 +24,9 @@ def save_review(review: HumanReview, supabase_client: Optional[object] = None) -
                 "reviewed_at": review.reviewed_at,
             }
         ).execute()
+        error = getattr(response, "error", None)
+        if error:
+            raise RuntimeError(f"Supabase review insert failed: {error}")
 
     return review
 
@@ -39,6 +42,9 @@ def get_review(document_id: str, supabase_client: Optional[object] = None) -> Op
             .limit(1)
             .execute()
         )
+        error = getattr(resp, "error", None)
+        if error:
+            raise RuntimeError(f"Supabase review read failed: {error}")
         rows = resp.data or []
         if rows:
             row = rows[0]

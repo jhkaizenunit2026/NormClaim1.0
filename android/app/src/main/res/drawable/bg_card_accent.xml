@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Card surface with subtle left-accent stripe via layer-list -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Accent stripe (left side) -->
+    <item android:right="358dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#4F8EF7"
+                android:endColor="#8B5CF6"
+                android:type="linear" />
+            <corners
+                android:topLeftRadius="16dp"
+                android:bottomLeftRadius="16dp" />
+        </shape>
+    </item>
+    <!-- Card body -->
+    <item android:left="4dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#0D1929" />
+            <corners
+                android:topRightRadius="16dp"
+                android:bottomRightRadius="16dp" />
+        </shape>
+    </item>
+</layer-list>

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Empty state illustration: document with magnifier -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+    <!-- Document body -->
+    <path
+        android:fillColor="#1A2D48"
+        android:pathData="M60,12H24C21.8,12 20,13.8 20,16V80C20,82.2 21.8,84 24,84H72C74.2,84 76,82.2 76,80V28L60,12Z" />
+    <!-- Folded corner -->
+    <path
+        android:fillColor="#253D5A"
+        android:pathData="M60,12V28H76L60,12Z" />
+    <!-- Lines (text placeholder) -->
+    <path
+        android:fillColor="#2A4060"
+        android:pathData="M30,44H66V48H30Z" />
+    <path
+        android:fillColor="#2A4060"
+        android:pathData="M30,54H58V58H30Z" />
+    <path
+        android:fillColor="#2A4060"
+        android:pathData="M30,64H52V68H30Z" />
+    <!-- Magnifier circle -->
+    <path
+        android:fillColor="#0D1929"
+        android:strokeColor="#4F8EF7"
+        android:strokeWidth="4"
+        android:pathData="M62,54A14,14 0,1 1,62,82A14,14 0,1 1,62,54Z" />
+    <!-- Magnifier handle -->
+    <path
+        android:fillColor="#4F8EF7"
+        android:pathData="M73,79L79,85L77,87L71,81Z" />
+    <!-- Inner circle -->
+    <path
+        android:fillColor="#4F8EF720"
+        android:pathData="M62,59A9,9 0,1 1,62,77A9,9 0,1 1,62,59Z" />
+    <!-- Plus in magnifier -->
+    <path
+        android:fillColor="#4F8EF7"
+        android:pathData="M66,65H70V69H66V73H62V69H58V65H62V61H66Z" />
+</vector>

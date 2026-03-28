@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="oval">
-    <solid android:color="#028090" />
-    <size android:width="108dp" android:height="108dp" />
-</shape>
+<!-- NormClaim logo icon — DNA helix + plus cross mark -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Dark circle background -->
+    <path
+        android:fillColor="#0D1929"
+        android:pathData="M54,0A54,54 0,1 1,54,108A54,54 0,1 1,54,0Z" />
+    <!-- Gradient blue cross (claim symbol) -->
+    <path
+        android:fillColor="#4F8EF7"
+        android:pathData="M46,30h16v16h16v16h-16v16h-16v-16h-16v-16h16z" />
+    <!-- Small accent dot top-right -->
+    <path
+        android:fillColor="#8B5CF6"
+        android:pathData="M71,27A5,5 0,1 1,71,37A5,5 0,1 1,71,27Z" />
+</vector>

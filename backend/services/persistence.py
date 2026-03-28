@@ -42,6 +42,10 @@ def _migrate_schema() -> None:
             conn.execute(text(f"ALTER TABLE documents ADD COLUMN file_blob {blob_type}"))
         if "storage_key" not in cols:
             conn.execute(text("ALTER TABLE documents ADD COLUMN storage_key VARCHAR(1024)"))
+        if "consent_obtained" not in cols:
+            conn.execute(text("ALTER TABLE documents ADD COLUMN consent_obtained BOOLEAN DEFAULT FALSE"))
+        if "status" not in cols:
+            conn.execute(text("ALTER TABLE documents ADD COLUMN status VARCHAR(50) DEFAULT 'uploaded'"))
 
 
 _migrate_schema()
@@ -54,27 +58,20 @@ def save_document(
     file_bytes: bytes,
     storage_key: Optional[str],
 ) -> None:
-    row = db.get(DocumentRecord, document_id)
-    if row is None:
-        row = DocumentRecord(
-            id=document_id,
-            filename=filename,
-            file_size_bytes=len(file_bytes),
-            has_extraction=False,
-            has_report=False,
-            file_blob=file_bytes,
-            storage_key=storage_key,
-        )
-        db.add(row)
-    else:
-        row.filename = filename
-        row.file_size_bytes = len(file_bytes)
-        row.file_blob = file_bytes
-        row.storage_key = storage_key
-    db.commit()
+    """Legacy wrapper — delegates to the model with consent=False."""
+    from models.database import save_document_with_consent
+    save_document_with_consent(
+        db=db,
+        document_id=document_id,
+        filename=filename,
+        file_bytes=file_bytes,
+        consent_obtained=False,
+        storage_key=storage_key,
+    )
 
 
-def get_document_meta(db: Session, document_id: str) -> Optional[DocumentRecord]:
+def get_document_record(db: Session, document_id: str) -> Optional[DocumentRecord]:
+    """Return the raw DocumentRecord ORM object."""
     return db.get(DocumentRecord, document_id)
 
 

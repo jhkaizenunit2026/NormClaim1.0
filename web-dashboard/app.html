@@ -24,6 +24,8 @@
 
   <!-- ── Scripts ──────────────────────────────────────────────── -->
   <script src="js/constants.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-client.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/api.js"></script>
   <script src="js/router.js"></script>
@@ -103,10 +105,19 @@
     </div>`;
     }
 
-    function loginAs(role) {
+    async function loginAs(role) {
+      const email = window.prompt('Supabase email');
+      if (!email) return;
+      const password = window.prompt('Supabase password');
+      if (!password) return;
+
       const names = { HOSPITAL: 'Dr. Mehta', TPA: 'Rahul Sharma', FINANCE: 'Anita Kapoor' };
-      AuthStore.login({ role, name: names[role], hospitalId: 'HSP-CITY-01', tpaOfficerId: 'TPA-001', financeUserId: 'FIN-001' });
-      showToast(`Logged in as ${ROLE_META[role].label}`, 'success');
+      try {
+        await AuthStore.login({ role, name: names[role], email, password });
+        showToast(`Logged in as ${ROLE_META[role].label}`, 'success');
+      } catch (e) {
+        showToast(e.message || 'Login failed', 'error');
+      }
     }
 
     // ── Register Routes ────────────────────────────────────────────

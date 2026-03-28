@@ -56,6 +56,9 @@ from routers.review import router as review_router
 from routers.feedback import router as feedback_router
 from routers.validate import router as validate_router
 from routers.analytics import router as analytics_router
+from routers.auth import router as auth_router
+from routers.config import router as config_router
+from routers.claims import router as claims_router
 
 app.include_router(documents_router)
 app.include_router(extract_router)
@@ -65,25 +68,41 @@ app.include_router(review_router)
 app.include_router(feedback_router)
 app.include_router(analytics_router)
 app.include_router(validate_router)
+app.include_router(auth_router)
+app.include_router(config_router)
+app.include_router(claims_router)
 
 
 # ── Supabase Client Setup ────────────────────────────────────────────────
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_SERVICE_KEY")
+SUPABASE_URL = os.environ.get("NEXT_PUBLIC_SUPABASE_URL") or os.environ.get("SUPABASE_URL")
+SUPABASE_ANON_KEY = os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+SUPABASE_SERVICE_ROLE_KEY = (
+    os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    or os.environ.get("SUPABASE_SERVICE_KEY")
+    or os.environ.get("SUPABASE_KEY")
+)
 
-supabase: Optional[Client] = None
-if not SUPABASE_URL or not SUPABASE_KEY:
-    logger.warning("Supabase credentials not set. Running with in-memory fallback for uploads/listing.")
-else:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    logger.info("✓  Supabase client initialized successfully")
+supabase_auth: Optional[Client] = None
+supabase_admin: Optional[Client] = None
+supabase: Optional[Client] = None  # Backward compatibility alias for existing modules.
+
+if not SUPABASE_URL or not SUPABASE_ANON_KEY or not SUPABASE_SERVICE_ROLE_KEY:
+    raise EnvironmentError(
+        "Supabase credentials missing. Required env vars: NEXT_PUBLIC_SUPABASE_URL, "
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY"
+    )
+
+supabase_auth = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+supabase_admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+supabase = supabase_admin
+logger.info("✓  Supabase clients initialized (anon + service role)")
 
 # ── Health check ──────────────────────────────────────────────────────────
 @app.get("/health", tags=["System"])
 async def health():
     """Health check endpoint."""
     gemini_configured = bool(os.environ.get("GEMINI_API_KEY"))
-    supabase_configured = bool(SUPABASE_URL and SUPABASE_KEY)
+    supabase_configured = bool(SUPABASE_URL and SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY)
     return {
         "status": "ok",
         "service": "normclaim-backend",

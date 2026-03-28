@@ -1,10 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ══════════════════════════════════════════════
+         NormClaim — Design System Tokens
+         ══════════════════════════════════════════════ -->
+
+    <!-- Core App Theme -->
     <style name="Theme.NormClaim" parent="Theme.Material3.Dark.NoActionBar">
-        <item name="colorPrimary">#028090</item>
-        <item name="colorPrimaryVariant">#026974</item>
+        <!-- Brand primaries -->
+        <item name="colorPrimary">#4F8EF7</item>
+        <item name="colorPrimaryContainer">#1B3A6B</item>
+        <item name="colorOnPrimaryContainer">#C5D8FF</item>
+        <item name="colorPrimaryVariant">#3B77E3</item>
         <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="android:statusBarColor">#08131F</item>
-        <item name="android:navigationBarColor">#08131F</item>
-        <item name="android:windowBackground">#08131F</item>
+
+        <!-- Secondary (violet accent) -->
+        <item name="colorSecondary">#8B5CF6</item>
+        <item name="colorSecondaryContainer">#3B1F7A</item>
+        <item name="colorOnSecondaryContainer">#DDD6FE</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+
+        <!-- Tertiary (teal) -->
+        <item name="colorTertiary">#14B8A6</item>
+        <item name="colorTertiaryContainer">#0D4B45</item>
+        <item name="colorOnTertiaryContainer">#99F6E4</item>
+
+        <!-- Surface / Background -->
+        <item name="colorSurface">#0D1929</item>
+        <item name="colorSurfaceVariant">#14243C</item>
+        <item name="colorOnSurface">#E8EDF5</item>
+        <item name="colorOnSurfaceVariant">#8FA3BF</item>
+        <item name="colorBackground">#07101C</item>
+        <item name="colorOnBackground">#E8EDF5</item>
+
+        <!-- Outline -->
+        <item name="colorOutline">#233552</item>
+        <item name="colorOutlineVariant">#1A2D48</item>
+
+        <!-- Error -->
+        <item name="colorError">#F87171</item>
+        <item name="colorErrorContainer">#7F1D1D</item>
+        <item name="colorOnError">#FFFFFF</item>
+
+        <!-- System bars -->
+        <item name="android:statusBarColor">#07101C</item>
+        <item name="android:navigationBarColor">#07101C</item>
+        <item name="android:windowBackground">#07101C</item>
+
+        <!-- Shape overrides -->
+        <item name="shapeAppearanceLargeComponent">@style/Shape.NormClaim.Large</item>
+        <item name="shapeAppearanceMediumComponent">@style/Shape.NormClaim.Medium</item>
+        <item name="shapeAppearanceSmallComponent">@style/Shape.NormClaim.Small</item>
     </style>
+
+    <!-- ── Shapes ── -->
+    <style name="Shape.NormClaim.Large" parent="ShapeAppearance.Material3.LargeComponent">
+        <item name="cornerSize">20dp</item>
+    </style>
+    <style name="Shape.NormClaim.Medium" parent="ShapeAppearance.Material3.MediumComponent">
+        <item name="cornerSize">14dp</item>
+    </style>
+    <style name="Shape.NormClaim.Small" parent="ShapeAppearance.Material3.SmallComponent">
+        <item name="cornerSize">8dp</item>
+    </style>
+
+    <!-- ── Button styles ── -->
+    <style name="Widget.NormClaim.Button.Primary" parent="Widget.Material3.Button">
+        <item name="android:paddingTop">14dp</item>
+        <item name="android:paddingBottom">14dp</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.02</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="cornerRadius">14dp</item>
+        <item name="backgroundTint">#4F8EF7</item>
+    </style>
+
+    <style name="Widget.NormClaim.Button.Secondary" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="cornerRadius">10dp</item>
+        <item name="strokeColor">#4F8EF7</item>
+        <item name="android:textColor">#4F8EF7</item>
+    </style>
+
+    <!-- ── Card styles ── -->
+    <style name="Widget.NormClaim.Card" parent="Widget.Material3.CardView.Filled">
+        <item name="cardBackgroundColor">#0D1929</item>
+        <item name="cardCornerRadius">16dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">#1A2D48</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
+    <style name="Widget.NormClaim.Card.Elevated" parent="Widget.NormClaim.Card">
+        <item name="cardElevation">4dp</item>
+    </style>
+
+    <!-- ── Text styles ── -->
+    <style name="TextAppearance.NormClaim.Display" parent="TextAppearance.Material3.DisplaySmall">
+        <item name="android:textColor">#E8EDF5</item>
+        <item name="android:textSize">28sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.NormClaim.Headline" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:textColor">#E8EDF5</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.NormClaim.Label" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:textColor">#8FA3BF</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:letterSpacing">0.06</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+
+    <style name="TextAppearance.NormClaim.Caption" parent="TextAppearance.Material3.BodySmall">
+        <item name="android:textColor">#8FA3BF</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <!-- ── Chip style ── -->
+    <style name="Widget.NormClaim.Chip.Status" parent="Widget.Material3.Chip.Assist">
+        <item name="android:textSize">10sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="chipMinHeight">24dp</item>
+    </style>
+
+    <!-- ── TabLayout ── -->
+    <style name="Widget.NormClaim.TabLayout" parent="Widget.Material3.TabLayout">
+        <item name="tabIndicatorColor">#4F8EF7</item>
+        <item name="tabSelectedTextColor">#FFFFFF</item>
+        <item name="tabTextColor">#8FA3BF</item>
+        <item name="tabIndicatorHeight">3dp</item>
+        <item name="tabIndicatorFullWidth">false</item>
+        <item name="tabMode">fixed</item>
+        <item name="tabGravity">fill</item>
+    </style>
+
 </resources>

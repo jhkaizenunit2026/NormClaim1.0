@@ -3,7 +3,7 @@ NormClaim — Analytics API
 GET /api/analytics — dashboard metrics (Stage 9 feedback loop + reconciliation).
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from models.schemas import AnalyticsSnapshot
 from routers.documents import DOCUMENTS
@@ -11,6 +11,7 @@ from routers.extract import EXTRACTIONS
 from routers.reconcile import REPORTS
 from services.analytics_service import build_snapshot
 from services.feedback_service import FEEDBACK
+from services.auth import require_user
 
 router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
 
@@ -24,7 +25,7 @@ def _get_supabase_client():
 
 
 @router.get("", response_model=AnalyticsSnapshot)
-async def get_analytics():
+async def get_analytics(_: dict = Depends(require_user)):
     """Aggregate counts, average claim delta, and feedback mix."""
     supabase = _get_supabase_client()
     doc_count = len(DOCUMENTS)

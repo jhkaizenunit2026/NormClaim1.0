@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Blue circle background for icon containers -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#122040" />
+    <stroke android:width="1dp" android:color="#1E3A6A" />
+</shape>

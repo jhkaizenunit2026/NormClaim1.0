@@ -16,7 +16,7 @@ def save_feedback(item: FeedbackItem, supabase_client: Optional[object] = None) 
     FEEDBACK.setdefault(item.document_id, []).append(item)
 
     if supabase_client is not None:
-        supabase_client.table("feedback").insert(
+        response = supabase_client.table("feedback").insert(
             {
                 "document_id": item.document_id,
                 "was_correct": item.was_extraction_correct,
@@ -24,6 +24,9 @@ def save_feedback(item: FeedbackItem, supabase_client: Optional[object] = None) 
                 "details": item.details,
             }
         ).execute()
+        error = getattr(response, "error", None)
+        if error:
+            raise RuntimeError(f"Supabase feedback insert failed: {error}")
 
     return item
 
@@ -37,6 +40,9 @@ def get_feedback(document_id: str, supabase_client: Optional[object] = None) -> 
             .eq("document_id", document_id)
             .execute()
         )
+        error = getattr(resp, "error", None)
+        if error:
+            raise RuntimeError(f"Supabase feedback read failed: {error}")
         rows = resp.data or []
         return [
             FeedbackItem(
