@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NormClaim — Analytics &amp; Feedback Loop</title>
+  <link rel="stylesheet" href="assets/style.css" />
+  <style>
+    .analytics-wrap {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: var(--sp-8) var(--sp-8) var(--sp-16);
+    }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--sp-4);
+      margin-bottom: var(--sp-8);
+    }
+    .metric-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-lg);
+      padding: var(--sp-5);
+    }
+    .metric-card .label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: var(--sp-2);
+    }
+    .metric-card .value {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      color: var(--text-primary);
+    }
+    .metric-card.teal .value { color: var(--teal-bright); }
+    .metric-card.gold .value { color: var(--gold); }
+    .correction-list {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+    }
+    .correction-list h3 {
+      margin: 0;
+      padding: var(--sp-4) var(--sp-5);
+      font-size: 0.85rem;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-elevated);
+    }
+    .correction-row {
+      display: flex;
+      justify-content: space-between;
+      padding: var(--sp-3) var(--sp-5);
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 0.85rem;
+    }
+    .correction-row:last-child { border-bottom: none; }
+    .source-pill {
+      display: inline-block;
+      margin-top: var(--sp-6);
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--bg-elevated);
+      color: var(--text-muted);
+      border: 1px solid var(--border-subtle);
+    }
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="index.html" class="nav-logo">
+    <div class="nav-logo-mark">N</div>
+    <span class="nav-logo-text">Norm<span>Claim</span></span>
+  </a>
+  <div class="nav-links">
+    <a href="index.html" class="nav-link">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      Dashboard
+    </a>
+    <a href="review.html" class="nav-link">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      Review
+    </a>
+    <a href="reconcile.html" class="nav-link">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+      Reconcile
+    </a>
+    <a href="analytics.html" class="nav-link active">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      Analytics
+    </a>
+  </div>
+  <div class="nav-spacer"></div>
+  <span class="nav-badge">Stage 9</span>
+</nav>
+
+<main class="page-wrapper analytics-wrap">
+  <div class="page-header animate-in">
+    <div class="eyebrow">Feedback loop &amp; quality</div>
+    <h1>Analytics</h1>
+    <p>Session aggregates from reconciliation runs and reviewer feedback — supports pitch metrics and continuous improvement.</p>
+  </div>
+
+  <div class="metrics-grid animate-in-delay-1" id="metricsGrid">
+    <div class="metric-card teal">
+      <div class="label">Documents</div>
+      <div class="value" id="mDocs">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Extractions</div>
+      <div class="value" id="mExt">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Reconciliations</div>
+      <div class="value" id="mRec">—</div>
+    </div>
+    <div class="metric-card gold">
+      <div class="label">Total ₹ delta (sum)</div>
+      <div class="value" id="mInr">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Avg ₹ delta / doc</div>
+      <div class="value" id="mAvgDelta">—</div>
+    </div>
+    <div class="metric-card teal">
+      <div class="label">Avg confidence</div>
+      <div class="value" id="mConf">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Missed diagnoses (total)</div>
+      <div class="value" id="mMissed">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Feedback accuracy</div>
+      <div class="value" id="mAcc">—</div>
+    </div>
+  </div>
+
+  <div class="correction-list animate-in-delay-2">
+    <h3>Correction types (from feedback)</h3>
+    <div id="corrBody">
+      <div class="correction-row text-muted" style="justify-content:center;">Loading…</div>
+    </div>
+  </div>
+
+  <p class="source-pill" id="dataSource">data: —</p>
+</main>
+
+<div id="toast-container"></div>
+
+<script>
+  const API = 'http://localhost:8000';
+
+  async function load() {
+    try {
+      const res = await fetch(`${API}/api/analytics`);
+      if (!res.ok) throw new Error();
+      const a = await res.json();
+      document.getElementById('mDocs').textContent = a.total_documents;
+      document.getElementById('mExt').textContent = a.total_extractions;
+      document.getElementById('mRec').textContent = a.total_reconciliations;
+      document.getElementById('mInr').textContent = '₹' + Math.round(a.total_inr_recovered || 0).toLocaleString('en-IN');
+      document.getElementById('mAvgDelta').textContent = '₹' + Math.round(a.avg_claim_delta_inr || 0).toLocaleString('en-IN');
+      document.getElementById('mConf').textContent = a.avg_extraction_confidence > 0
+        ? (a.avg_extraction_confidence * 100).toFixed(1) + '%' : '—';
+      document.getElementById('mMissed').textContent = a.total_missed_diagnoses ?? 0;
+      document.getElementById('mAcc').textContent = a.total_feedback_events > 0
+        ? (a.extraction_accuracy_rate * 100).toFixed(0) + '%' : '—';
+      document.getElementById('dataSource').textContent = 'data: ' + (a.data_source || 'memory');
+
+      const counts = a.correction_type_counts || {};
+      const entries = Object.entries(counts).filter(([k]) => k);
+      const body = document.getElementById('corrBody');
+      if (!entries.length) {
+        body.innerHTML = '<div class="correction-row text-muted" style="justify-content:center;">No feedback submitted yet</div>';
+      } else {
+        body.innerHTML = entries.sort((a,b) => b[1]-a[1]).map(([k,v]) =>
+          `<div class="correction-row"><span>${k.replace(/_/g,' ')}</span><strong>${v}</strong></div>`
+        ).join('');
+      }
+    } catch {
+      document.getElementById('corrBody').innerHTML =
+        '<div class="correction-row text-muted" style="justify-content:center;">Backend unavailable — start API on :8000</div>';
+    }
+  }
+  load();
+</script>
+</body>
+</html>

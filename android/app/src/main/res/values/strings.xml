@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">NormClaim</string>
+    <string name="upload">Upload PDF</string>
+    <string name="documents">Documents</string>
+</resources>

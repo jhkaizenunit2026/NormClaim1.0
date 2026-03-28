@@ -1,0 +1,22 @@
+services:
+  fhir:
+    build:
+      context: ./fhir-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      SPRING_PROFILES_ACTIVE: default
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      FHIR_SERVICE_URL: http://fhir:8001/fhir/bundle
+    depends_on:
+      - fhir
