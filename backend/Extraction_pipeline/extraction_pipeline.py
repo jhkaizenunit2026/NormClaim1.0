@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 import re
 import tempfile
 import uuid
@@ -26,6 +27,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import google.genai as gen
 import cv2
@@ -39,6 +41,12 @@ from docx import Document as DocxDocument
 from PIL import Image
 from pydantic import BaseModel, Field, field_validator
 from supabase import Client
+
+from .text_features import (
+    build_section_map,
+    detect_script_enum_value,
+    extract_negated_spans,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -192,9 +200,6 @@ class CombinedExtraction(BaseModel):
 class OCRProcessor:
     """Handles text extraction from PDF/image/DOCX with preprocessing."""
 
-    DEVANAGARI_RANGE = re.compile(r"[\u0900-\u097F]")
-    ENGLISH_RANGE = re.compile(r"[A-Za-z]")
-
     @staticmethod
     def _preprocess_image(img_array: np.ndarray) -> np.ndarray:
         """Deskew, denoise, and binarize for better OCR accuracy."""
@@ -283,83 +288,7 @@ class OCRProcessor:
     @classmethod
     def detect_script(cls, text: str) -> Script:
         """Detect dominant script in extracted text."""
-        dev_count = len(cls.DEVANAGARI_RANGE.findall(text))
-        eng_count = len(cls.ENGLISH_RANGE.findall(text))
-        if dev_count > 20 and eng_count > 20:
-            return Script.HINGLISH
-        elif dev_count > eng_count:
-            return Script.DEVANAGARI
-        return Script.ENGLISH
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION MAPPER (lightweight, no spaCy model download required at runtime)
-# ─────────────────────────────────────────────────────────────────────────────
-
-SECTION_PATTERNS: dict[str, list[str]] = {
-    "diagnosis": [
-        r"diagnosis", r"impression", r"assessment", r"icd", r"clinical diagnosis",
-        r"final diagnosis", r"provisional diagnosis", r"निदान"
-    ],
-    "history": [
-        r"history", r"c/o", r"complaints", r"presenting", r"chief complaint",
-        r"h/o", r"past history", r"इतिहास"
-    ],
-    "medications": [
-        r"medication", r"prescription", r"drug", r"tablet", r"capsule",
-        r"injection", r"syrup", r"दवाई"
-    ],
-    "procedures": [
-        r"procedure", r"surgery", r"operation", r"operation notes", r"intervention"
-    ],
-    "vitals": [
-        r"vitals", r"blood pressure", r"pulse", r"temperature", r"spo2", r"weight"
-    ],
-    "referral": [
-        r"referred", r"referral", r"refer to", r"consulting", r"रेफरल"
-    ],
-}
-
-
-def build_section_map(text: str) -> dict[str, str]:
-    """
-    Map sentence indices to section labels.
-    Returns {sentence_index_str: section_label} — matches ai_extraction_records.section_map format.
-    """
-    sentences = [s.strip() for s in re.split(r"[.!\n]+", text) if s.strip()]
-    section_map: dict[str, str] = {}
-    current_section = "general"
-
-    for idx, sentence in enumerate(sentences):
-        lower = sentence.lower()
-        for section, patterns in SECTION_PATTERNS.items():
-            if any(re.search(p, lower) for p in patterns):
-                current_section = section
-                break
-        section_map[str(idx)] = current_section
-
-    return section_map
-
-
-def extract_negated_spans(text: str) -> list[str]:
-    """
-    Rule-based negation detection.
-    Finds phrases like 'no fever', 'denies diabetes', 'not known to have'.
-    NormClaim rule: negated=true diagnoses NEVER enter FHIR.
-    """
-    negation_patterns = [
-        r"no\s+(\w+(?:\s+\w+){0,2})",
-        r"not\s+(\w+(?:\s+\w+){0,2})",
-        r"denies?\s+(\w+(?:\s+\w+){0,2})",
-        r"absent\s+(\w+(?:\s+\w+){0,2})",
-        r"without\s+(\w+(?:\s+\w+){0,2})",
-        r"नहीं\s+(\w+(?:\s+\w+){0,2})",
-    ]
-    negated: list[str] = []
-    for pattern in negation_patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        negated.extend(matches)
-    return list(set(negated))
+        return Script(detect_script_enum_value(text))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -484,6 +413,25 @@ class ExtractionPipeline:
         self.ocr = OCRProcessor()
         self.gemini = GeminiExtractionEngine(google_api_key)
 
+    def _trusted_supabase_host(self) -> str | None:
+        supabase_url = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+        if not supabase_url:
+            return None
+        parsed = urlparse(supabase_url)
+        return (parsed.hostname or "").lower() or None
+
+    def _is_trusted_storage_url(self, storage_url: str) -> bool:
+        parsed = urlparse(storage_url)
+        host = (parsed.hostname or "").lower()
+        if parsed.scheme != "https" or not host:
+            return False
+
+        trusted_host = self._trusted_supabase_host()
+        if trusted_host and host != trusted_host:
+            return False
+
+        return parsed.path.startswith("/storage/v1/object/")
+
     # ── CONSENT GATE ──────────────────────────────────────────────────────────
 
     def _assert_consent(self, patient_id: str, pre_auth_form_id: str) -> None:
@@ -561,9 +509,25 @@ class ExtractionPipeline:
                 f"missing_types={missing_types}, unverified_types={unverified_types}"
             )
 
-    def _download_file(self, storage_url: str) -> bytes:
-        """Download file bytes from Supabase Storage URL."""
-        resp = httpx.get(storage_url, timeout=30)
+    def _download_file(self, attachment: dict) -> bytes:
+        """Download file bytes from trusted Supabase Storage metadata only."""
+        storage_key = (
+            attachment.get("storage_key")
+            or attachment.get("file_path")
+            or attachment.get("path")
+        )
+        storage_bucket = attachment.get("storage_bucket") or attachment.get("bucket") or "documents"
+
+        if storage_key:
+            return self.db.storage.from_(storage_bucket).download(storage_key)
+
+        storage_url = attachment.get("storage_url")
+        if not storage_url:
+            raise ValueError("Attachment is missing both storage_key and storage_url")
+        if not self._is_trusted_storage_url(storage_url):
+            raise ValueError("Untrusted storage URL blocked")
+
+        resp = httpx.get(storage_url, timeout=30, follow_redirects=False)
         resp.raise_for_status()
         return resp.content
 
@@ -578,11 +542,10 @@ class ExtractionPipeline:
         """
         doc_type = attachment["doc_type"]
         file_format = attachment.get("file_format", "pdf")
-        storage_url = attachment["storage_url"]
 
         logger.info("Processing %s doc: %s", doc_type, attachment.get("filename"))
 
-        file_bytes = self._download_file(storage_url)
+        file_bytes = self._download_file(attachment)
         raw_text = self.ocr.extract_text(file_bytes, file_format)
 
         extraction: Any = None
@@ -692,6 +655,7 @@ class ExtractionPipeline:
         """
         diag = combined.diagnosis_report
         id_proof = combined.id_proof
+        referral = combined.referral
 
         patient_resp = (
             self.db.table("patients")
@@ -712,9 +676,19 @@ class ExtractionPipeline:
                 "age": patient_data.get("age"),
                 "sex": patient_data.get("gender"),
                 "abha_id": patient_data.get("abha_id"),
+                "id_proof_extraction": (
+                    id_proof.model_dump(mode="json", exclude_none=True)
+                    if id_proof
+                    else None
+                ),
             },
             "encounter_snapshot": {
                 "estimated_los_days": diag.estimated_los_days if diag else None,
+                "referral_extraction": (
+                    referral.model_dump(mode="json", exclude_none=True)
+                    if referral
+                    else None
+                ),
             },
             "diagnoses": self._build_diagnoses_json(diag) if diag else [],
             "procedures": self._build_procedures_json(diag) if diag else [],
@@ -829,6 +803,7 @@ class ExtractionPipeline:
         referral_result: ReferralExtraction | None = None
         all_texts: list[str] = []
         source_urls: list[str] = []
+        failed_attachments: list[dict[str, str]] = []
 
         for attachment in attachments:
             try:
@@ -848,6 +823,13 @@ class ExtractionPipeline:
                     "Failed to process attachment %s: %s",
                     attachment.get("id"), exc
                 )
+                failed_attachments.append(
+                    {
+                        "attachment_id": str(attachment.get("id") or ""),
+                        "doc_type": str(attachment.get("doc_type") or ""),
+                        "error": str(exc),
+                    }
+                )
                 self._audit_log(
                     patient_id=patient_id,
                     stage="extraction",
@@ -857,6 +839,42 @@ class ExtractionPipeline:
                     diff_snapshot={"error": str(exc)},
                     user_id=requesting_user_id,
                 )
+
+        if failed_attachments:
+            self._audit_log(
+                patient_id=patient_id,
+                stage="extraction",
+                action="pre_auth.extraction.aborted_partial_failure",
+                table_affected="document_attachments",
+                record_id=pre_auth_form_id,
+                diff_snapshot={"failed_attachments": failed_attachments},
+                user_id=requesting_user_id,
+            )
+            raise RuntimeError(
+                "Extraction aborted because one or more mandatory documents failed to process."
+            )
+
+        if not id_proof_result or not diag_result or not referral_result:
+            missing_doc_types: list[str] = []
+            if not id_proof_result:
+                missing_doc_types.append(DocType.ID_PROOF.value)
+            if not diag_result:
+                missing_doc_types.append(DocType.DIAGNOSIS_REPORT.value)
+            if not referral_result:
+                missing_doc_types.append(DocType.REFERRAL_LETTER.value)
+
+            self._audit_log(
+                patient_id=patient_id,
+                stage="extraction",
+                action="pre_auth.extraction.aborted_incomplete_results",
+                table_affected="ai_extraction_records",
+                record_id=pre_auth_form_id,
+                diff_snapshot={"missing_doc_types": missing_doc_types},
+                user_id=requesting_user_id,
+            )
+            raise RuntimeError(
+                f"Extraction aborted because required results are missing: {missing_doc_types}"
+            )
 
         # 6. Build combined text for section mapping and negation detection
         combined_text = "\n\n".join(all_texts)

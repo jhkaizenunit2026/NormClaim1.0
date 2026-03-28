@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -29,6 +30,82 @@ from services.auth import require_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+ADMIN_ROLES = {"admin", "superadmin"}
+OWNER_FIELD_CANDIDATES = (
+    "user_id",
+    "owner_user_id",
+    "created_by",
+    "created_by_user_id",
+    "assigned_user_id",
+)
+
+
+def _is_admin_user(current_user: dict) -> bool:
+    return str(current_user.get("role", "")).strip().lower() in ADMIN_ROLES
+
+
+def _find_owner_user_id(row: dict | None) -> str | None:
+    if not row:
+        return None
+    for field in OWNER_FIELD_CANDIDATES:
+        value = row.get(field)
+        if value:
+            return str(value)
+    return None
+
+
+def _assert_can_access_pre_auth_form(supabase: Any, pre_auth_form_id: str, current_user: dict) -> dict:
+    """Authorize access to a pre-auth form by direct owner or linked patient owner."""
+    form_resp = (
+        supabase.table("pre_auth_forms")
+        .select("*")
+        .eq("id", pre_auth_form_id)
+        .single()
+        .execute()
+    )
+    form_row = form_resp.data
+    if not form_row:
+        raise HTTPException(status_code=404, detail="pre_auth_form not found")
+
+    if _is_admin_user(current_user):
+        return form_row
+
+    current_user_id = str(current_user.get("id") or "")
+    if not current_user_id:
+        raise HTTPException(status_code=401, detail="Authenticated user id missing")
+
+    form_owner = _find_owner_user_id(form_row)
+    if form_owner is not None:
+        if form_owner == current_user_id:
+            return form_row
+        raise HTTPException(status_code=403, detail="Not authorized to access this pre-auth form")
+
+    patient_id = form_row.get("patient_id")
+    if patient_id:
+        patient_resp = (
+            supabase.table("patients")
+            .select("*")
+            .eq("id", patient_id)
+            .single()
+            .execute()
+        )
+        patient_row = patient_resp.data or {}
+        patient_owner = _find_owner_user_id(patient_row)
+        if patient_owner is not None:
+            if patient_owner == current_user_id:
+                return form_row
+            raise HTTPException(status_code=403, detail="Not authorized to access this pre-auth form")
+
+    logger.warning(
+        "Denied pre-auth access because no owner mapping is available: form=%s user=%s",
+        pre_auth_form_id,
+        current_user_id,
+    )
+    raise HTTPException(
+        status_code=403,
+        detail="Pre-auth ownership is not configured for this record",
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -96,6 +173,7 @@ async def auto_fill_pre_auth(
     try:
         supabase = get_supabase()
         google_api_key = get_google_api_key()
+        _assert_can_access_pre_auth_form(supabase, pre_auth_form_id, current_user)
 
         orchestrator = PreAuthOrchestrator(supabase, google_api_key)
         result = orchestrator.process(
@@ -141,17 +219,7 @@ async def get_fill_status(
 ):
     """Returns current form_status, auto_filled_fields, and field_requirements_meta."""
     supabase = get_supabase()
-    resp = (
-        supabase.table("pre_auth_forms")
-        .select("id, form_status, auto_filled, auto_filled_fields, field_requirements_meta")
-        .eq("id", pre_auth_form_id)
-        .single()
-        .execute()
-    )
-    if not resp.data:
-        raise HTTPException(status_code=404, detail="pre_auth_form not found")
-
-    data = resp.data
+    data = _assert_can_access_pre_auth_form(supabase, pre_auth_form_id, current_user)
     return StatusResponse(
         pre_auth_form_id=pre_auth_form_id,
         form_status=data.get("form_status", "draft"),
@@ -178,6 +246,7 @@ async def apply_correction(
     """
     try:
         supabase = get_supabase()
+        _assert_can_access_pre_auth_form(supabase, pre_auth_form_id, current_user)
         handler = CorrectionHandler(supabase)
         result = handler.apply_correction(
             pre_auth_form_id=pre_auth_form_id,
@@ -219,25 +288,43 @@ async def get_confidence_report(
     Used by the reviewer UI to highlight which fields need human attention.
     """
     supabase = get_supabase()
+    _assert_can_access_pre_auth_form(supabase, pre_auth_form_id, current_user)
     resp = (
         supabase.table("document_attachments")
-        .select("storage_url, filename")
+        .select("storage_url, filename, uploaded_at")
         .eq("entity_type", "pre_auth")
         .eq("entity_id", pre_auth_form_id)
         .eq("doc_type", "other")
-        .eq("filename", "confidence_report.json")
-        .order("id", desc=True)
-        .limit(1)
         .execute()
     )
-    if not resp.data:
+    rows = resp.data or []
+    report_rows = [
+        r for r in rows
+        if str(r.get("filename") or "").startswith("confidence_report")
+    ]
+    if not report_rows:
         raise HTTPException(
             status_code=404,
             detail="No confidence report found. Run auto-fill first."
         )
 
+    latest = sorted(
+        report_rows,
+        key=lambda r: str(r.get("uploaded_at") or ""),
+        reverse=True,
+    )[0]
+    confidence_report_url = latest.get("storage_url")
+
+    parsed = urlparse(str(confidence_report_url or ""))
+    if parsed.scheme not in {"http", "https"}:
+        confidence_report_url = None
+
     return {
         "pre_auth_form_id": pre_auth_form_id,
-        "confidence_report_url": resp.data[0]["storage_url"],
-        "message": "Fetch this URL from Supabase Storage to view the full report.",
+        "confidence_report_url": confidence_report_url,
+        "message": (
+            "Fetch this URL from Supabase Storage to view the full report."
+            if confidence_report_url
+            else "Report exists but public URL is unavailable; check storage permissions."
+        ),
     }

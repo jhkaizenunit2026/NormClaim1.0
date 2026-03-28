@@ -9,6 +9,12 @@ import re
 import os
 from typing import List, Dict
 
+from Extraction_pipeline.text_features import (
+    build_section_map as shared_build_section_map,
+    detect_script_label,
+    extract_negated_spans as shared_extract_negated_spans,
+)
+
 # medspaCy 1.x registers the "medspacy_context" factory on import.
 MEDSPACY_AVAILABLE = False
 try:
@@ -48,12 +54,13 @@ def detect_sections(doc) -> Dict[str, str]:
     }
     section_map = {}
     for sent in doc.sents:
+        sent_key = str(sent.start)
         for section, keywords in section_keywords.items():
             if any(keyword.lower() in sent.text.lower() for keyword in keywords):
-                section_map[sent.start] = section
+                section_map[sent_key] = section
                 break
         else:
-            section_map[sent.start] = "unknown"
+            section_map[sent_key] = "unknown"
     return section_map
 
 def detect_negated_spans(doc) -> List[str]:
@@ -92,9 +99,20 @@ def preprocess(raw_text: str) -> Dict:
     """Run the full preprocessing pipeline."""
     expanded_text = expand_abbreviations(raw_text)
     doc = nlp(expanded_text)
+
+    # Keep existing spaCy/medspaCy section mapping, but backfill unknown slots
+    # from shared Extraction_pipeline rules to avoid drift across pipelines.
     section_map = detect_sections(doc)
-    negated_spans = detect_negated_spans(doc)
-    detected_script = detect_script(raw_text)
+    shared_section_map = shared_build_section_map(expanded_text)
+    for key, label in shared_section_map.items():
+        if key not in section_map or section_map.get(key) == "unknown":
+            section_map[key] = label
+
+    # Merge medspaCy negation findings with shared regex-based extraction.
+    negated_spans = list(
+        set(detect_negated_spans(doc) + shared_extract_negated_spans(expanded_text))
+    )
+    detected_script = detect_script_label(raw_text)
     return {
         "expanded_text": expanded_text,
         "section_map": section_map,

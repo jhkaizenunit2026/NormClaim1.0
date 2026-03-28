@@ -14,6 +14,8 @@ import logging
 from pathlib import Path
 from typing import Dict, List
 
+from dotenv import load_dotenv
+
 from google import genai
 from rapidfuzz import process, fuzz
 
@@ -29,6 +31,9 @@ from services.pdf_parser import extract_text_from_pdf, pdf_to_base64_image
 from services.nlp_preprocessor import preprocess
 
 logger = logging.getLogger(__name__)
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(_PROJECT_ROOT / ".env")
 
 _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 with open(os.path.join(_DATA_DIR, "icd10_codes.json"), "r", encoding="utf-8") as f:
@@ -120,6 +125,20 @@ def _extract_response_text(response: object) -> str:
     return "\n".join(chunks).strip()
 
 
+def _normalize_low_confidence_flags(value: object) -> list[str]:
+    """Coerce model output into a stable list[str] for schema validation."""
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(v) for v in value if v is not None]
+    if isinstance(value, dict):
+        # Gemini occasionally emits an object; preserve information deterministically.
+        if "flags" in value and isinstance(value["flags"], list):
+            return [str(v) for v in value["flags"] if v is not None]
+        return [str(k) for k in value.keys()]
+    return [str(value)]
+
+
 def _call_gemini_with_retry(client: genai.Client, prompt_text: str) -> Dict:
     last_error = None
     for attempt in range(MAX_RETRIES):
@@ -195,6 +214,9 @@ def extract_from_document(file_bytes: bytes, document_id: str) -> ExtractionResu
     data = _call_gemini_with_retry(client, prompt_text)
     data = apply_negation_override(data, spacy_result["negated_spans"])
     data["diagnoses"] = validate_icd10_codes(data.get("diagnoses", []))
+    data["low_confidence_flags"] = _normalize_low_confidence_flags(
+        data.get("low_confidence_flags")
+    )
 
     medications = []
     for m in data.get("medications", []):

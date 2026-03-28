@@ -79,11 +79,14 @@ def build_field_requirements_meta(filled_fields: set[str]) -> dict[str, dict]:
 
 
 def all_mandatory_filled(meta: dict[str, dict]) -> bool:
-    return all(
-        v["filled"]
-        for v in meta.values()
-        if v["requirement"] == "mandatory"
-    )
+    mandatory_values = [
+        v
+        for v in (meta or {}).values()
+        if isinstance(v, dict) and v.get("requirement") == "mandatory"
+    ]
+    if not mandatory_values:
+        return False
+    return all(bool(v.get("filled")) for v in mandatory_values)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -395,6 +398,8 @@ class PreAuthFiller:
         diagnoses_raw = extraction_row.get("diagnoses") or []
         medications_raw = extraction_row.get("medications") or []
         procedures_raw = extraction_row.get("procedures") or []
+        patient_snapshot = extraction_row.get("patient_snapshot") or {}
+        encounter_snapshot = extraction_row.get("encounter_snapshot") or {}
 
         diag_items = [DiagnosisItem(**d) for d in diagnoses_raw]
         med_items = [MedicationItem(**m) for m in medications_raw]
@@ -417,6 +422,35 @@ class PreAuthFiller:
             overall_confidence=extraction_row.get("confidence_score", 0.0),
         ) if diag_items else None
 
+        id_proof_extraction: IdProofExtraction | None = None
+        id_proof_raw = patient_snapshot.get("id_proof_extraction")
+        if isinstance(id_proof_raw, dict):
+            try:
+                id_proof_extraction = IdProofExtraction(**id_proof_raw)
+            except Exception as exc:
+                logger.warning("Failed to reconstruct id_proof_extraction: %s", exc)
+
+        if id_proof_extraction is None:
+            fallback_id_proof = {
+                "patient_name": patient_snapshot.get("name"),
+                "gender": patient_snapshot.get("sex"),
+                "abha_id": patient_snapshot.get("abha_id"),
+                "confidence": float(extraction_row.get("confidence_score") or 0.0),
+            }
+            if fallback_id_proof["patient_name"] or fallback_id_proof["abha_id"]:
+                try:
+                    id_proof_extraction = IdProofExtraction(**fallback_id_proof)
+                except Exception as exc:
+                    logger.warning("Failed to build fallback id_proof_extraction: %s", exc)
+
+        referral_extraction: ReferralExtraction | None = None
+        referral_raw = encounter_snapshot.get("referral_extraction")
+        if isinstance(referral_raw, dict):
+            try:
+                referral_extraction = ReferralExtraction(**referral_raw)
+            except Exception as exc:
+                logger.warning("Failed to reconstruct referral_extraction: %s", exc)
+
         detected_script_val = extraction_row.get("detected_script", "English")
         try:
             detected_script = Script(detected_script_val)
@@ -424,9 +458,9 @@ class PreAuthFiller:
             detected_script = Script.ENGLISH
 
         return CombinedExtraction(
-            id_proof=None,
+            id_proof=id_proof_extraction,
             diagnosis_report=diag_extraction,
-            referral=None,
+            referral=referral_extraction,
             detected_script=detected_script,
             section_map=extraction_row.get("section_map") or {},
             negated_spans=extraction_row.get("negated_spans") or [],
@@ -447,17 +481,30 @@ class PreAuthFiller:
         source = "abha" if patient.get("abha_verified") else "hospital_db"
         fields = []
 
-        if patient.get("patient_name"):
-            # Cross-reference with whatever is already in the form
-            existing_id_type = form.get("id_proof_type")
-            if not existing_id_type:
-                fields.append(FieldMapping(
+        existing_id_type = form.get("id_proof_type")
+        if existing_id_type:
+            return fields
+
+        # Only infer from explicit patient data; never default to Aadhaar.
+        patient_id_type = str(patient.get("id_proof_type") or patient.get("id_type") or "").strip().lower()
+        allowed_types = {"aadhaar", "pan", "passport", "voter_id"}
+        inferred_id_type: str | None = None
+
+        if patient_id_type in allowed_types:
+            inferred_id_type = patient_id_type
+        elif patient.get("abha_id"):
+            inferred_id_type = "aadhaar"
+
+        if inferred_id_type:
+            fields.append(
+                FieldMapping(
                     field_name="id_proof_type",
-                    value="aadhaar",  # default assumption
-                    confidence=0.5,
+                    value=inferred_id_type,
+                    confidence=1.0 if patient_id_type in allowed_types else 0.8,
                     source=source,
                     should_write=True,
-                ))
+                )
+            )
 
         return fields
 
@@ -493,10 +540,37 @@ class PreAuthFiller:
         uploaded_by: str | None = None,
     ) -> None:
         """
-        Save the confidence report as a document_attachments row.
-        The actual file would be written to Supabase Storage in production;
-        here we store the JSON inline in filename for simplicity.
+        Save the confidence report to Supabase Storage and register it in
+        document_attachments.
         """
+        report_bytes = json.dumps(report, ensure_ascii=False).encode("utf-8")
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        filename = f"confidence_report_{ts}.json"
+        storage_bucket = "documents"
+        storage_key = f"reports/{pre_auth_form_id}/{filename}"
+
+        storage_url: str | None = None
+        try:
+            self.db.storage.from_(storage_bucket).upload(storage_key, report_bytes)
+            try:
+                public_url_result = self.db.storage.from_(storage_bucket).get_public_url(storage_key)
+                if isinstance(public_url_result, str):
+                    storage_url = public_url_result
+                elif isinstance(public_url_result, dict):
+                    storage_url = (
+                        public_url_result.get("publicURL")
+                        or public_url_result.get("publicUrl")
+                        or (public_url_result.get("data") or {}).get("publicUrl")
+                    )
+            except Exception:
+                storage_url = None
+        except Exception as exc:
+            logger.warning("Could not upload confidence report to storage: %s", exc)
+            return
+
+        if not storage_url:
+            storage_url = storage_key
+
         row = {
             "id": str(uuid.uuid4()),
             "entity_type": "pre_auth",
@@ -504,10 +578,10 @@ class PreAuthFiller:
             "doc_type": "other",
             "is_mandatory": False,
             "is_verified": False,
-            "storage_url": f"reports/{pre_auth_form_id}/confidence_report.json",
-            "filename": "confidence_report.json",
+            "storage_url": storage_url,
+            "filename": filename,
             "file_format": "json",
-            "file_size_bytes": len(json.dumps(report).encode()),
+            "file_size_bytes": len(report_bytes),
             "uploaded_by": uploaded_by or "system",
         }
         try:
@@ -756,6 +830,25 @@ class CorrectionHandler:
         patient_id = form["patient_id"]
         meta = form.get("field_requirements_meta") or {}
         auto_filled = form.get("auto_filled_fields") or []
+
+        # Normalize metadata before evaluating completeness so empty/malformed
+        # state does not incorrectly pass mandatory checks.
+        if not meta:
+            meta = build_field_requirements_meta(set(auto_filled))
+        else:
+            normalized_meta = build_field_requirements_meta(set(auto_filled))
+            for field_name_key, field_meta in meta.items():
+                if isinstance(field_meta, dict):
+                    if field_name_key in normalized_meta:
+                        normalized_meta[field_name_key]["filled"] = bool(
+                            field_meta.get("filled")
+                        )
+                    else:
+                        normalized_meta[field_name_key] = {
+                            "requirement": field_meta.get("requirement", "optional"),
+                            "filled": bool(field_meta.get("filled")),
+                        }
+            meta = normalized_meta
 
         # Update the specific field
         field_update: dict[str, Any] = {field_name: corrected_value}
