@@ -1,0 +1,2 @@
+document_id,report_json,claim_delta_inr,created_at
+doc-sample-001,"{""summary"": ""Pre-auth aligned with policy limits"", ""flags"": []}",2500.5,2026-03-01T12:10:00+00:00

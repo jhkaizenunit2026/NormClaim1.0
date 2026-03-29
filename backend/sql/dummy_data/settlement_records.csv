@@ -1,0 +1,3 @@
+id,admission_id,utr_number,settlement_amount,tds_amount,deductions,final_payable,settlement_date,remarks,confidence,parsed_at
+eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01,44444444-4444-4444-4444-444444444444,UTR987654321,73800,1800,"[{""code"": ""NME"", ""amount"": 1200}]",72000,2026-03-18,Auto-parsed from insurer email,0.94,2026-03-18T11:00:00+00:00
+eeeeeeee-eeee-eeee-eeee-eeeeeeeeee02,44444444-4444-4444-4444-444444444445,UTR123456789,110000,2000,"[{""code"": ""copay"", ""amount"": 8000}]",108000,2026-03-21,Verified against remittance advice,0.97,2026-03-21T14:30:00+00:00

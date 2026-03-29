@@ -26,6 +26,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("normclaim")
 
+_DEFAULT_CORS = (
+    "http://localhost:3000,http://localhost:5173,"
+    "http://127.0.0.1:3000,http://127.0.0.1:5173"
+)
+
+
+def _cors_origins() -> list[str]:
+    raw = os.environ.get("CORS_ORIGINS", _DEFAULT_CORS)
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
 # ── Create FastAPI app ────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -83,7 +94,7 @@ app = FastAPI(
 # ── CORS middleware ───────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(","),
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -101,7 +112,7 @@ from routers.analytics import router as analytics_router
 from routers.auth import router as auth_router
 from routers.config import router as config_router
 from routers.claims import router as claims_router
-from routers.notifications import router as notifications_router
+from routers.notifications import router as notifications_router, ws_router as notifications_ws_router
 from routers.discharge import router as discharge_router
 from routers.enhancement import router as enhancement_router
 from routers.settlement import router as settlement_router
@@ -120,6 +131,7 @@ app.include_router(auth_router)
 app.include_router(config_router)
 app.include_router(claims_router)
 app.include_router(notifications_router)
+app.include_router(notifications_ws_router)
 app.include_router(discharge_router)
 app.include_router(enhancement_router)
 app.include_router(settlement_router)

@@ -1,0 +1,2 @@
+document_id,result_json,created_at
+doc-sample-001,"{""patient_name"": ""Rajesh Kumar"", ""diagnosis"": ""Acute appendicitis"", ""amount_requested"": 85000}",2026-03-01T12:05:00+00:00

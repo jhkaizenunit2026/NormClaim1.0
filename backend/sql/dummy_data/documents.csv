@@ -1,0 +1,3 @@
+id,filename,upload_time,has_extraction,has_report,file_size_bytes,file_blob,storage_key,consent_obtained,status
+doc-sample-001,preauth_packet_rajesh.pdf,2026-03-01T12:00:00+00:00,true,true,245760,,hospital/documents/2026/03/doc-sample-001.pdf,true,uploaded
+doc-sample-002,discharge_summary_priya.pdf,2026-03-05T09:30:00+00:00,false,false,189440,,hospital/documents/2026/03/doc-sample-002.pdf,true,uploaded

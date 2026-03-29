@@ -1,0 +1,3 @@
+id,admission_id,original_amount,suggested_amount,justification_text,severity_score,cost_breakdown,status,tpa_response,created_at,updated_at
+dddddddd-dddd-dddd-dddd-dddddddddd01,44444444-4444-4444-4444-444444444444,85000,95000,ICU extension by 2 days; sepsis workup,0.72,"{""icu"": 6000, ""labs"": 4000}",submitted,"{""decision"": ""partial"", ""approved_inr"": 90000}",2026-03-08T09:00:00+00:00,2026-03-09T16:00:00+00:00
+dddddddd-dddd-dddd-dddd-dddddddddd02,44444444-4444-4444-4444-444444444445,120000,120000,No change — informational,0.1,"{}",draft,,2026-03-07T08:00:00+00:00,2026-03-07T08:05:00+00:00

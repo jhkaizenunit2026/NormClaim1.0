@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional, Tuple
 
-from .extraction_pipeline import IdProofExtraction, DiagnosisReportExtraction, ReferralExtraction
+if TYPE_CHECKING:
+    from .extraction_pipeline import (
+        DiagnosisReportExtraction,
+        IdProofExtraction,
+        ReferralExtraction,
+    )
 
 
 class ABHALookupService:

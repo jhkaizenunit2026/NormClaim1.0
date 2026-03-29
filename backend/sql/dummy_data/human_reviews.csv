@@ -1,0 +1,3 @@
+id,document_id,reviewer_notes,corrections_json,reviewed_at
+aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa01,doc-sample-001,Amount and ICD code verified against discharge summary,"[{""field"": ""diagnosis"", ""from"": ""appendicitis"", ""to"": ""Acute appendicitis""}]",2026-03-02T15:00:00+00:00
+aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa02,doc-sample-002,Pending full clinical review,"[]",2026-03-06T10:00:00+00:00

@@ -1,0 +1,4 @@
+id,email,name,role,hospital_id,tpa_officer_id,finance_user_id,avatar_url,created_at,updated_at
+10000000-0000-0000-0000-000000000001,hospital.admin@example.com,City General Admin,HOSPITAL,HOSP-001,,,https://example.com/avatars/h1.png,2026-01-15T10:00:00+00:00,2026-03-01T08:30:00+00:00
+10000000-0000-0000-0000-000000000002,tpa.reviewer@example.com,TPA Reviewer One,TPA,,TPA-OFF-22,,https://example.com/avatars/t1.png,2026-02-01T09:00:00+00:00,2026-03-10T11:00:00+00:00
+10000000-0000-0000-0000-000000000003,finance.ops@example.com,Finance Ops,FINANCE,,,,https://example.com/avatars/f1.png,2026-02-10T14:00:00+00:00,2026-03-12T09:15:00+00:00

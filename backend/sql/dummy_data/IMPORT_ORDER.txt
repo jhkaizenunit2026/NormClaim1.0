@@ -1,0 +1,21 @@
+Import CSVs in this order so foreign keys resolve.
+
+1. auth.users — create test users with ids used in profiles/patients CSVs, OR set
+   profiles.id / patients.user_id / pre_auth_forms user columns to NULL in CSV for local testing.
+
+2. profiles.csv          (needs auth.users for id)
+3. patients.csv          (needs auth.users if user_id is set)
+4. insurance_policies.csv
+5. pre_auth_forms.csv
+6. documents.csv
+7. extractions.csv, reports.csv, fhir_bundles.csv  (need documents)
+8. claims.csv
+9. ai_extraction_records.csv
+10. document_attachments.csv
+11. audit_logs.csv
+12. preauth_corrections.csv
+13. human_reviews.csv, feedback.csv, reconciliations.csv
+14. admissions.csv      (needs patients + pre_auth_forms)
+15. enhancement_requests.csv, settlement_records.csv, finance_reconciliations.csv
+
+admissions.csv must be imported AFTER patients.csv (and after pre_auth_forms.csv for pre_auth_form_id).
