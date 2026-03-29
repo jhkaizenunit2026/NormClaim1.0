@@ -398,6 +398,15 @@ body::before {
   color: var(--text-primary);
 }
 
+/* Normclaim teal accent helpers (used for auth dialog accent swap) */
+.nc-accent { color: var(--teal-bright) !important; }
+.nc-bg-accent { background-color: var(--teal-bright) !important; }
+.nc-border-accent { border-color: var(--teal-bright) !important; }
+.nc-bg-accent-20 { background-color: rgba(3,163,184,0.12) !important; }
+.nc-btn-accent { background-color: var(--teal-bright) !important; color: white !important; }
+.nc-btn-accent:hover { background-color: var(--teal) !important; }
+
+
 .stat-value.teal  { color: var(--teal-bright); }
 .stat-value.gold  { color: var(--gold); }
 .stat-value.red   { color: var(--red-bright); }

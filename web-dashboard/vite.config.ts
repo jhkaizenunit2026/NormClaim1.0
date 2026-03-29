@@ -19,6 +19,7 @@ export default defineConfig({
         beams: path.resolve(__dirname, "src/beams-mount.tsx"),
         statcards: path.resolve(__dirname, "src/stat-cards-mount.tsx"),
         auth: path.resolve(__dirname, "src/auth-mount.tsx"),
+        flowbuttons: path.resolve(__dirname, "src/flow-buttons-mount.tsx"),
       },
       output: {
         inlineDynamicImports: false,
@@ -26,6 +27,7 @@ export default defineConfig({
           if (chunkInfo.name === "beams") return "beams-bg.js";
           if (chunkInfo.name === "statcards") return "stat-cards.js";
           if (chunkInfo.name === "auth") return "auth-overlay.js";
+          if (chunkInfo.name === "flowbuttons") return "flow-buttons.js";
           return "[name].js";
         },
         assetFileNames: "[name][extname]",

@@ -6,7 +6,6 @@ import {
   Building2,
   Landmark,
   Loader2,
-  Lock,
   LogIn,
   Sun,
   User,
@@ -44,8 +43,7 @@ const roleIcon = {
   FINANCE: Landmark,
 } as const;
 
-const STRIP_GRAD =
-  "bg-[linear-gradient(90deg,rgba(255,255,255,0)_0%,#000000_69%,rgba(255,255,255,0.18)_100%)]";
+
 
 const LEFT_BG =
   "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?q=80&w=1200&auto=format&fit=crop";
@@ -166,14 +164,14 @@ export function FullScreenSignup({
         style={{ backgroundImage: `url(${LEFT_BG})` }}
       />
       <div className="pointer-events-none absolute inset-0 z-[2] bg-gradient-to-t from-transparent to-black" />
-      <div className="pointer-events-none w-60 h-60 bg-orange-500 absolute z-[1] rounded-full -bottom-20 -left-16 blur-sm opacity-90" />
+  <div className="pointer-events-none w-60 h-60 nc-bg-accent absolute z-[1] rounded-full -bottom-20 -left-16 blur-sm opacity-90" />
       <div className="pointer-events-none w-32 h-20 bg-white absolute z-[1] rounded-full bottom-2 left-24 opacity-25 blur-md" />
       <div className="pointer-events-none w-28 h-16 bg-white absolute z-[1] rounded-full bottom-8 left-48 opacity-20 blur-md" />
 
       {/* Left column */}
       <div className="bg-black text-white p-8 md:p-12 md:w-1/2 relative rounded-bl-3xl md:rounded-bl-3xl overflow-hidden flex flex-col justify-end min-h-[280px] md:min-h-[32rem]">
         <div className="relative z-10">
-          <p className="text-orange-500 text-sm font-medium mb-3 tracking-wide uppercase">
+          <p className="nc-accent text-sm font-medium mb-3 tracking-wide uppercase">
             NormClaim
           </p>
           <h1
@@ -203,7 +201,7 @@ export function FullScreenSignup({
         )}
 
         <div className="flex flex-col items-start mb-6 md:mb-8">
-          <div className="text-orange-500 mb-4">
+          <div className="nc-accent mb-4">
             <Sunburst className="h-10 w-10" strokeWidth={1.5} />
           </div>
           <h2 className="text-3xl font-medium mb-2 tracking-tight text-white">
@@ -223,10 +221,10 @@ export function FullScreenSignup({
               setMode("signin");
               setFormError(null);
             }}
-            className={cn(
+              className={cn(
               "flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition border",
               mode === "signin"
-                ? "border-orange-500 bg-orange-500/20 text-orange-400"
+                ? "nc-border-accent nc-bg-accent-20 nc-accent"
                 : "border-neutral-700 bg-neutral-900 text-neutral-400 hover:border-neutral-500"
             )}
           >
@@ -242,7 +240,7 @@ export function FullScreenSignup({
             className={cn(
               "flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition border",
               mode === "signup"
-                ? "border-orange-500 bg-orange-500/20 text-orange-400"
+                ? "nc-border-accent nc-bg-accent-20 nc-accent"
                 : "border-neutral-700 bg-neutral-900 text-neutral-400 hover:border-neutral-500"
             )}
           >
@@ -266,7 +264,7 @@ export function FullScreenSignup({
                 className={cn(
                   "flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-center text-[11px] font-medium transition",
                   active
-                    ? "border-orange-500 bg-orange-500/20 text-orange-400"
+                    ? "nc-border-accent nc-bg-accent-20 nc-accent"
                     : "border-neutral-700 bg-neutral-900 text-neutral-400 hover:border-orange-500/50"
                 )}
               >
@@ -337,7 +335,6 @@ export function FullScreenSignup({
               {mode === "signup" ? "Create password" : "Password"}
             </label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
               <input
                 type="password"
                 id="nc-password"
@@ -347,7 +344,7 @@ export function FullScreenSignup({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={cn(
-                  "text-sm w-full py-2.5 pl-10 pr-3 border rounded-lg focus:outline-none focus:ring-2 bg-neutral-900 text-white placeholder:text-neutral-500 focus:ring-orange-500/40 focus:border-orange-500",
+                  "text-sm w-full py-2.5 pl-3 pr-3 border rounded-lg focus:outline-none focus:ring-2 bg-neutral-900 text-white placeholder:text-neutral-500 focus:ring-orange-500/40 focus:border-orange-500",
                   fieldErrors.password
                     ? "border-red-500"
                     : "border-neutral-700"
@@ -368,7 +365,6 @@ export function FullScreenSignup({
                 Confirm password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
                 <input
                   type="password"
                   id="nc-confirm"
@@ -376,7 +372,7 @@ export function FullScreenSignup({
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   className={cn(
-                    "text-sm w-full py-2.5 pl-10 pr-3 border rounded-lg focus:outline-none focus:ring-2 bg-neutral-900 text-white placeholder:text-neutral-500 focus:ring-orange-500/40 focus:border-orange-500",
+                    "text-sm w-full py-2.5 pl-3 pr-3 border rounded-lg focus:outline-none focus:ring-2 bg-neutral-900 text-white placeholder:text-neutral-500 focus:ring-orange-500/40 focus:border-orange-500",
                     fieldErrors.confirm
                       ? "border-red-500"
                       : "border-neutral-700"
@@ -398,7 +394,7 @@ export function FullScreenSignup({
           <button
             type="submit"
             disabled={pending}
-            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-medium py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+            className="w-full nc-btn-accent disabled:opacity-60 font-medium py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
           >
             {pending ? (
               <>
@@ -424,7 +420,7 @@ export function FullScreenSignup({
                 Already have an account?{" "}
                 <button
                   type="button"
-                  className="text-orange-600 font-semibold underline underline-offset-2"
+                  className="nc-accent font-semibold underline underline-offset-2"
                   onClick={() => {
                     setMode("signin");
                     setFormError(null);
@@ -438,7 +434,7 @@ export function FullScreenSignup({
                 New here?{" "}
                 <button
                   type="button"
-                  className="text-orange-600 font-semibold underline underline-offset-2"
+                  className="nc-accent font-semibold underline underline-offset-2"
                   onClick={() => {
                     setMode("signup");
                     setFormError(null);

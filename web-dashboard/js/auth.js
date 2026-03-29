@@ -4,6 +4,24 @@
 // Fallback: LocalDB for fully-offline demo mode
 // ═══════════════════════════════════════════════════════════════
 
+// Helper: determine if an error is an infrastructure/network issue
+// (should fall back to LocalDB) vs a real user-facing auth error
+// (should be shown to the user).
+function _isSupabaseUnavailableError(msg) {
+  if (!msg) return true;
+  const m = msg.toLowerCase();
+  return (
+    m.includes('failed to fetch') ||       // Chrome/Firefox network error
+    m.includes('load failed') ||            // Safari network error
+    m.includes('networkerror') ||           // Generic network error
+    m.includes('network request failed') || // React Native style
+    m.includes('not loaded') ||             // SDK not loaded
+    m.includes('not configured') ||         // Config missing
+    m.includes('unable to load') ||         // Config endpoint down
+    m.includes('supabase browser sdk')      // SDK missing
+  );
+}
+
 const AuthStore = {
   _user: null,
   _listeners: [],
@@ -115,13 +133,13 @@ const AuthStore = {
         return this._user;
       }
     } catch (e) {
-      // If it was a real Supabase error (not "client not available"), rethrow
-      if (e.message !== 'Supabase browser SDK is not loaded.' &&
-          !e.message.includes('not configured') &&
-          !e.message.includes('Unable to load')) {
+      // Network/infrastructure error → fall back to LocalDB
+      if (_isSupabaseUnavailableError(e.message)) {
+        console.warn('[Auth] Supabase login unavailable, falling back to LocalDB:', e.message);
+      } else {
+        // Real auth error (wrong password, etc.) → show to user
         throw e;
       }
-      console.warn('[Auth] Supabase login unavailable, falling back to LocalDB:', e.message);
     }
 
     // Fallback: LocalDB sign-in (demo/offline mode)
@@ -191,12 +209,13 @@ const AuthStore = {
         return this._user;
       }
     } catch (e) {
-      if (e.message !== 'Supabase browser SDK is not loaded.' &&
-          !e.message.includes('not configured') &&
-          !e.message.includes('Unable to load')) {
+      // Network/infrastructure error → fall back to LocalDB
+      if (_isSupabaseUnavailableError(e.message)) {
+        console.warn('[Auth] Supabase signup unavailable, falling back to LocalDB:', e.message);
+      } else {
+        // Real auth error → show to user
         throw e;
       }
-      console.warn('[Auth] Supabase signup unavailable, falling back to LocalDB:', e.message);
     }
 
     // Fallback: LocalDB

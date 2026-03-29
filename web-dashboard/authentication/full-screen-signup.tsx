@@ -48,7 +48,7 @@ export const FullScreenSignup = () => {
         setSubmitted(false);
       } catch (err: unknown) {
         setServerError(
-          err instanceof Error ? err.message : "Something went wrong."
+          err instanceof Error ? err.message : "Something went wrong.",
         );
       }
     }
@@ -75,14 +75,14 @@ export const FullScreenSignup = () => {
         </div>
 
         {/* decorative blobs */}
-        <div className="w-60 h-60 bg-orange-500 absolute z-[1] rounded-full -bottom-10 -left-10 opacity-60 blur-2xl" />
+        <div className="w-60 h-60 nc-bg-accent absolute z-[1] rounded-full -bottom-10 -left-10 opacity-60 blur-2xl" />
         <div className="w-32 h-20 bg-white absolute z-[1] rounded-full bottom-0 opacity-20" />
 
         {/* LEFT — branding */}
         <div className="bg-black text-white p-8 md:p-12 md:w-1/2 relative rounded-bl-3xl overflow-hidden">
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-6">
-              <Sunburst className="h-7 w-7 text-orange-500" />
+              <Sunburst className="h-7 w-7 nc-accent" />
               <span className="text-base font-semibold tracking-tight">
                 Normclaim
               </span>
@@ -112,7 +112,7 @@ export const FullScreenSignup = () => {
         {/* RIGHT — form */}
         <div className="p-8 md:p-12 md:w-1/2 flex flex-col bg-zinc-100 dark:bg-zinc-900 z-[99] text-zinc-900 dark:text-white relative">
           <div className="flex flex-col items-start mb-8">
-            <div className="text-orange-500 mb-4">
+            <div className="nc-accent mb-4">
               <Sunburst className="h-10 w-10" />
             </div>
             <h2 className="text-3xl font-medium mb-2 tracking-tight">
@@ -174,10 +174,7 @@ export const FullScreenSignup = () => {
                 aria-describedby="su-password-error"
               />
               {passwordError && (
-                <p
-                  id="su-password-error"
-                  className="text-red-500 text-xs mt-1"
-                >
+                <p id="su-password-error" className="text-red-500 text-xs mt-1">
                   {passwordError}
                 </p>
               )}
@@ -186,7 +183,7 @@ export const FullScreenSignup = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="w-full nc-btn-accent disabled:opacity-60 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
               {isLoading && (
                 <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -198,7 +195,7 @@ export const FullScreenSignup = () => {
               Already have an account?{" "}
               <a
                 href="/login"
-                className="text-orange-500 font-medium hover:underline"
+                className="nc-accent font-medium hover:underline"
               >
                 Sign in
               </a>

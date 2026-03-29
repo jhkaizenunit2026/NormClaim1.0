@@ -206,7 +206,7 @@ const SharedComponents = {
           <button type="button" class="btn btn-ghost btn-sm" onclick="AuthStore.logout()" aria-label="Log out">
             <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
           </button>
-        ` : '<span class="nav-badge">Sign In</span>'}
+        ` : '<span class="nc-flow-mount nc-flow-mount--nav" data-flow-mode="signin" data-flow-label="Sign In" aria-label="Sign In"></span>'}
       </nav>
     </div>`;
   }

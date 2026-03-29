@@ -21,9 +21,14 @@ export default {
           from: { backgroundPosition: "0% 0%" },
           to: { backgroundPosition: "0% -1000%" },
         },
+        shimmer2: {
+          "0%": { backgroundPosition: "0% 0%" },
+          "100%": { backgroundPosition: "-200% 0%" },
+        },
       },
       animation: {
         moveBackground: "moveBackground 60s linear infinite",
+        shimmer2: "shimmer2 2s infinite linear",
       },
     },
   },
