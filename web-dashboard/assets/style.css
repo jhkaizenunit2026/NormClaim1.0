@@ -343,7 +343,12 @@ body::before {
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-lg);
   padding: var(--sp-6);
-  transition: border-color var(--t-base), box-shadow var(--t-base);
+  transition: all var(--t-base);
+  cursor: pointer;
+}
+
+.card:active {
+  transform: scale(0.98);
 }
 
 .card:hover {
@@ -432,10 +437,15 @@ body::before {
   border-radius: var(--r-lg);
   overflow: hidden;
   transition: transform var(--t-base);
+  cursor: pointer;
 }
 
 .stat-card-react:hover {
   transform: translateY(-3px);
+}
+
+.stat-card-react:active {
+  transform: scale(0.96);
 }
 
 /* ─── Buttons ───────────────────────────────────────────────── */
