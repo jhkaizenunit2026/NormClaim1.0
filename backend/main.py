@@ -65,6 +65,7 @@ from routers.discharge import router as discharge_router
 from routers.dispatch import router as dispatch_router
 from routers.settlements import router as settlements_router
 from routers.finance_recon import router as finance_recon_router
+from routers.notifications import router as notifications_router
 from Extraction_pipeline.router import router as preauth_router
 
 app.include_router(documents_router)
@@ -84,6 +85,7 @@ app.include_router(discharge_router)
 app.include_router(dispatch_router)
 app.include_router(settlements_router)
 app.include_router(finance_recon_router)
+app.include_router(notifications_router)
 app.include_router(preauth_router, prefix="/api/preauth", tags=["pre-auth"])
 
 

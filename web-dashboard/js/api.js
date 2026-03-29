@@ -2,12 +2,25 @@
 // NormClaim — API Service Layer
 // ═══════════════════════════════════════════════════════════════
 
-const API_BASE = window.NormClaimSupabase?.getApiBase?.() || (
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:8000' : 'http://localhost:8000'
-);
+// API base URL — resolved from NormClaimSupabase bridge (configurable via <meta> tag,
+// query param ?api=, or default http://localhost:8000). See supabase-client.js.
+const API_BASE = window.NormClaimSupabase?.getApiBase?.() || 'http://localhost:8000';
 
 const Api = {
+  _sanitizeForHtml(input) {
+    if (input == null) return input;
+    if (typeof input === 'string') return escapeHtml(input);
+    if (Array.isArray(input)) return input.map(v => this._sanitizeForHtml(v));
+    if (typeof input === 'object') {
+      const out = {};
+      for (const [k, v] of Object.entries(input)) {
+        out[k] = this._sanitizeForHtml(v);
+      }
+      return out;
+    }
+    return input;
+  },
+
   _getHeaders() {
     const h = { 'Content-Type': 'application/json' };
     const user = AuthStore.getUser();
@@ -29,7 +42,8 @@ const Api = {
           const detail = err?.detail || err?.message || res.statusText || `HTTP ${res.status}`;
           throw new Error(detail);
         }
-        return await res.json();
+        const payload = await res.json();
+        return this._sanitizeForHtml(payload);
       } catch (e) {
         if (i === retries) throw e;
         await new Promise(r => setTimeout(r, 500 * (i + 1)));

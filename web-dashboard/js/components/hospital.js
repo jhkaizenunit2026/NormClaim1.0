@@ -95,10 +95,10 @@ const HospitalComponents = {
           <p>Track all claims from pre-authorization through settlement and closure.</p>
         </div>
         <div class="stats-grid animate-in-delay-1" style="grid-template-columns:repeat(4,1fr);">
-          <div class="stat-card teal"><div class="stat-label">Active Cases</div><div class="stat-value teal" id="cs-active">—</div><div class="stat-sub">In progress</div></div>
-          <div class="stat-card gold"><div class="stat-label">Pending Approval</div><div class="stat-value gold" id="cs-pending">—</div><div class="stat-sub">Awaiting TPA</div></div>
-          <div class="stat-card green"><div class="stat-label">Settled</div><div class="stat-value green" id="cs-settled">—</div><div class="stat-sub">Payment received</div></div>
-          <div class="stat-card red"><div class="stat-label">Total Value</div><div class="stat-value red" id="cs-value">—</div><div class="stat-sub">All claims</div></div>
+          <div class="stat-card-react" id="cs-active" data-value="—" data-label="Active Cases"></div>
+          <div class="stat-card-react" id="cs-pending" data-value="—" data-label="Pending Approval"></div>
+          <div class="stat-card-react" id="cs-settled" data-value="—" data-label="Settled"></div>
+          <div class="stat-card-react" id="cs-value" data-value="—" data-label="Total Value"></div>
         </div>
         <div class="card animate-in-delay-2" style="padding:0;overflow:hidden;">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-5) var(--sp-6);border-bottom:1px solid var(--border-subtle);background:var(--bg-elevated);">
@@ -136,8 +136,12 @@ const HospitalComponents = {
     const settled = claims.filter(c => isAtOrPast(c.status, CLAIM_STATUS.SETTLEMENT_ISSUED)).length;
     const totalVal = claims.reduce((s, c) => s + (c.preAuthAmount || 0), 0);
     
-    const el = (id, val) => { const e = document.getElementById(id); if(e) e.textContent = val; };
-    el('cs-active', active); el('cs-pending', pending); el('cs-settled', settled); el('cs-value', formatINR(totalVal));
+    if (window.__setStatCardValue) {
+      window.__setStatCardValue('cs-active', String(active));
+      window.__setStatCardValue('cs-pending', String(pending));
+      window.__setStatCardValue('cs-settled', String(settled));
+      window.__setStatCardValue('cs-value', formatINR(totalVal));
+    }
     
     const tbody = document.getElementById('cases-tbody');
     if (!tbody) return;
@@ -232,7 +236,7 @@ const HospitalComponents = {
     if (st === CLAIM_STATUS.PRE_AUTH_APPROVED) return `<div class="card"><h3 class="mb-4">Pre-Auth Approved</h3><p>Amount approved: <strong style="color:var(--green);font-size:1.2rem;">${formatINR(claim.preAuthAmount)}</strong></p><button class="btn btn-primary mt-4" onclick="Router.navigate('portal/admission/${claim.claimId}')">Proceed to Admission</button></div>`;
     if (st === CLAIM_STATUS.ADMITTED) return `<div class="card"><h3 class="mb-4">Patient Admitted</h3><p>Admission Number: <strong class="font-mono text-teal" style="font-size:1.1rem;">${claim.admissionNumber || 'ADM-' + claim.claimId}</strong></p><div class="flex gap-3 mt-4"><button class="btn btn-gold" onclick="Router.navigate('portal/enhancement/${claim.claimId}')">Request Enhancement</button><button class="btn btn-primary" onclick="Router.navigate('portal/discharge/${claim.claimId}')">Initiate Discharge</button></div></div>`;
     if (st === CLAIM_STATUS.DISCHARGE_INTIMATED) return `<div class="card"><h3 class="mb-4">Discharge Documents Submitted</h3><p>The TPA is reviewing your discharge documents. SLA: ~3 hours from submission.</p>${claim.dischargeApprovalDeadline ? `<div class="card-sm mt-4" style="background:var(--gold-faint);"><span class="text-gold font-mono">Deadline: ${formatDateTime(claim.dischargeApprovalDeadline)}</span></div>` : ''}</div>`;
-    if (st === CLAIM_STATUS.DISCHARGE_APPROVED) return `<div class="card"><h3 class="mb-4">Discharge Approved</h3><div class="stats-grid" style="grid-template-columns:1fr 1fr 1fr;"><div class="stat-card red"><div class="stat-label">Copay</div><div class="stat-value red">${formatINR(claim.copay)}</div></div><div class="stat-card gold"><div class="stat-label">Deductions</div><div class="stat-value gold">${formatINR(claim.deductions)}</div></div><div class="stat-card green"><div class="stat-label">TPA Payable</div><div class="stat-value green">${formatINR(claim.tpaPayableAmount)}</div></div></div></div>`;
+    if (st === CLAIM_STATUS.DISCHARGE_APPROVED) return `<div class="card"><h3 class="mb-4">Discharge Approved</h3><div class="stats-grid" style="grid-template-columns:1fr 1fr 1fr;"><div class="stat-card-react" data-value="${formatINR(claim.copay)}" data-label="Copay"></div><div class="stat-card-react" data-value="${formatINR(claim.deductions)}" data-label="Deductions"></div><div class="stat-card-react" data-value="${formatINR(claim.tpaPayableAmount)}" data-label="TPA Payable"></div></div></div>`;
     if (st === CLAIM_STATUS.SETTLEMENT_ISSUED) return `<div class="card"><h3 class="mb-4">Settlement Issued</h3><p>Final settlement: <strong style="color:var(--green);font-size:1.3rem;">${formatINR(claim.finalSettlementAmount)}</strong></p><p class="mt-2 text-muted">UTR: ${claim.utrNumber || 'Pending'} | TDS: ${formatINR(claim.tdsAmount)}</p></div>`;
     if (st === CLAIM_STATUS.CLOSED) return `<div class="card" style="background:var(--green-faint);border-color:rgba(46,201,138,0.3);"><h3 class="mb-4" style="color:var(--green);">✓ Case Closed</h3><p>This case has been settled and closed. All payments have been processed.</p></div>`;
     return `<div class="card"><h3 class="mb-4">${STAGE_META[st]?.label || st}</h3><p>Claim is being processed at this stage.</p></div>`;
