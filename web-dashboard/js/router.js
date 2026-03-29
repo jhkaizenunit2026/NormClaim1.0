@@ -82,7 +82,10 @@ const Router = {
       }
     } catch (e) {
       console.error('Route error:', e);
-      this._container.innerHTML = `<div class="page-wrapper"><div class="empty-state"><h3>Error Loading Page</h3><p>${e.message}</p></div></div>`;
+      const message = e && e.message ? String(e.message) : 'Unknown error';
+      this._container.innerHTML = `<div class="page-wrapper"><div class="empty-state"><h3>Error Loading Page</h3><p id="route-error-message"></p></div></div>`;
+      const msgNode = document.getElementById('route-error-message');
+      if (msgNode) msgNode.textContent = message;
     }
   },
 
@@ -108,3 +111,5 @@ const Router = {
     }
   }
 };
+
+window.Router = Router;

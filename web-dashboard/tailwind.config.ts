@@ -4,11 +4,18 @@ export default {
   content: [
     "./src/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
+    "./auth/**/*.{ts,tsx}",
     "./index.html",
     "./app.html",
   ],
   theme: {
     extend: {
+      colors: {
+        secondary: {
+          DEFAULT: "#f4f4f5",
+          foreground: "#18181b",
+        },
+      },
       keyframes: {
         moveBackground: {
           from: { backgroundPosition: "0% 0%" },

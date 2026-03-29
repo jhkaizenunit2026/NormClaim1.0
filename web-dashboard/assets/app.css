@@ -169,6 +169,7 @@
 .role-stages { margin-top: var(--sp-2); }
 
 .login-footer {
+  margin-top: 24px;
   display: flex;
   justify-content: center;
   gap: var(--sp-3);

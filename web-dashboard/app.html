@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 
 <head>
   <meta charset="UTF-8" />
@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="assets/style.css" />
   <link rel="stylesheet" href="assets/app.css" />
   <link rel="stylesheet" href="assets/beams-bg.css" />
+  <link rel="stylesheet" href="assets/auth.css" />
 </head>
 
 <body>
@@ -26,10 +27,14 @@
   <!-- Toast container -->
   <div id="toast-container"></div>
 
+  <!-- React full-screen auth (assets/auth-overlay.js) -->
+  <div id="auth-root"></div>
+
   <!-- ── Scripts ──────────────────────────────────────────────── -->
   <script src="js/constants.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-client.js"></script>
+  <script src="js/local-db.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/api.js"></script>
   <script src="js/router.js"></script>
@@ -51,10 +56,23 @@
       const c = document.getElementById('toast-container');
       const t = document.createElement('div');
       t.className = `toast ${type}`;
-      t.innerHTML = `<span>${icons[type] || 'ℹ'}</span><span>${msg}</span>`;
+      const icon = document.createElement('span');
+      icon.textContent = icons[type] || 'ℹ';
+      const text = document.createElement('span');
+      text.textContent = String(msg || '');
+      t.appendChild(icon);
+      t.appendChild(text);
       c.appendChild(t);
       setTimeout(() => { t.classList.add('removing'); setTimeout(() => t.remove(), 300); }, 4000);
     }
+    window.showToast = showToast;
+
+    function openAuthDialog(mode, role) {
+      window.dispatchEvent(new CustomEvent('normclaim-open-auth', {
+        detail: { mode: mode === 'signup' ? 'signup' : 'signin', role: role || null }
+      }));
+    }
+    window.openAuthDialog = openAuthDialog;
 
     // ── Render Navbar ──────────────────────────────────────────────
     function renderNav() {
@@ -81,46 +99,35 @@
         <div class="login-roles">
           <h4 style="text-align:center;margin-bottom:var(--sp-6);color:var(--text-muted);">Select your role to continue</h4>
           <div class="role-cards">
-            <button class="role-card" onclick="loginAs('HOSPITAL')">
+            <button type="button" class="role-card" onclick="openAuthDialog('signin', 'HOSPITAL')">
               <div class="role-icon" style="background:var(--teal-faint);color:var(--teal-bright);">🏥</div>
               <div class="role-name">Hospital Portal</div>
               <div class="role-desc">Submit pre-auth, track claims, upload documents</div>
               <div class="role-stages"><span class="badge badge-teal">All 11 stages</span></div>
             </button>
-            <button class="role-card" onclick="loginAs('TPA')">
+            <button type="button" class="role-card" onclick="openAuthDialog('signin', 'TPA')">
               <div class="role-icon" style="background:var(--gold-faint);color:var(--gold);">📋</div>
               <div class="role-name">TPA Dashboard</div>
               <div class="role-desc">Review, approve, settle — full claim lifecycle</div>
               <div class="role-stages"><span class="badge badge-gold">All 11 stages</span></div>
             </button>
-            <button class="role-card" onclick="loginAs('FINANCE')">
+            <button type="button" class="role-card" onclick="openAuthDialog('signin', 'FINANCE')">
               <div class="role-icon" style="background:var(--green-faint);color:var(--green);">💰</div>
               <div class="role-name">Finance Panel</div>
               <div class="role-desc">Ledger entries, UTR tracking, reconciliation</div>
               <div class="role-stages"><span class="badge badge-green">Stages 9–11</span></div>
             </button>
           </div>
+          <div class="login-flow-cta-row" style="display:flex;flex-wrap:wrap;gap:var(--sp-4);justify-content:center;align-items:center;margin-top:var(--sp-8);">
+            <span class="nc-flow-mount" data-flow-mode="signin" data-flow-label="Sign in" aria-label="Sign in"></span>
+            <span class="nc-flow-mount" data-flow-mode="signup" data-flow-label="Create an account" aria-label="Create an account"></span>
+          </div>
         </div>
         <div class="login-footer">
-          <span class="badge badge-muted">Pre-Auth → Settlement · 11-Stage Workflow</span>
+          <span class="badge badge-muted">11-Step Claims Journey : Pre-Auth to Settlement</span>
         </div>
       </div>
     </div>`;
-    }
-
-    async function loginAs(role) {
-      const email = window.prompt('Supabase email');
-      if (!email) return;
-      const password = window.prompt('Supabase password');
-      if (!password) return;
-
-      const names = { HOSPITAL: 'Dr. Mehta', TPA: 'Rahul Sharma', FINANCE: 'Anita Kapoor' };
-      try {
-        await AuthStore.login({ role, name: names[role], email, password });
-        showToast(`Logged in as ${ROLE_META[role].label}`, 'success');
-      } catch (e) {
-        showToast(e.message || 'Login failed', 'error');
-      }
     }
 
     // ── Register Routes ────────────────────────────────────────────
@@ -156,19 +163,31 @@
     // Try WebSocket connection
     SocketManager.connect();
 
-    // Default route
-    if (!window.location.hash || window.location.hash === '#/') {
-      if (AuthStore.isLoggedIn()) {
-        const r = AuthStore.getRole();
-        if (r === ROLES.HOSPITAL) Router.navigate('portal/cases');
-        else if (r === ROLES.TPA) Router.navigate('tpa/queue');
-        else Router.navigate('finance/alerts');
-      } else {
-        Router.navigate('login');
+    // AuthStore.init() is async (Supabase session restore) — await before routing
+    (async () => {
+      try {
+        await AuthStore.init();
+      } catch (e) {
+        console.warn('[Boot] Auth init error:', e.message);
       }
-    }
+
+      // Default route (after auth is resolved)
+      if (!window.location.hash || window.location.hash === '#/') {
+        if (AuthStore.isLoggedIn()) {
+          const r = AuthStore.getRole();
+          if (r === ROLES.HOSPITAL) Router.navigate('portal/cases');
+          else if (r === ROLES.TPA) Router.navigate('tpa/queue');
+          else Router.navigate('finance/alerts');
+        } else {
+          Router.navigate('login');
+        }
+      }
+    })();
   </script>
   <script type="module" src="assets/beams-bg.js"></script>
+  <script type="module" src="assets/stat-cards.js"></script>
+  <script type="module" src="assets/flow-buttons.js"></script>
+  <script type="module" src="assets/auth-overlay.js"></script>
 </body>
 
 </html>
