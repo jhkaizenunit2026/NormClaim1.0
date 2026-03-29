@@ -2,10 +2,9 @@
 // NormClaim — API Service Layer
 // ═══════════════════════════════════════════════════════════════
 
-const API_BASE = window.NormClaimSupabase?.getApiBase?.() || (
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:8000' : 'http://localhost:8000'
-);
+// API base URL — resolved from NormClaimSupabase bridge (configurable via <meta> tag,
+// query param ?api=, or default http://localhost:8000). See supabase-client.js.
+const API_BASE = window.NormClaimSupabase?.getApiBase?.() || 'http://localhost:8000';
 
 const Api = {
   _sanitizeForHtml(input) {

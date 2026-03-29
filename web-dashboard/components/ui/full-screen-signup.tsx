@@ -166,17 +166,6 @@ export function FullScreenSignup({
         style={{ backgroundImage: `url(${LEFT_BG})` }}
       />
       <div className="pointer-events-none absolute inset-0 z-[2] bg-gradient-to-t from-transparent to-black" />
-      <div className="pointer-events-none absolute z-[2] flex overflow-hidden backdrop-blur-2xl opacity-80 left-0 top-0 h-full">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div
-            key={i}
-            className={cn(
-              "h-[40rem] z-[2] w-16 shrink-0 opacity-30 overflow-hidden",
-              STRIP_GRAD
-            )}
-          />
-        ))}
-      </div>
       <div className="pointer-events-none w-60 h-60 bg-orange-500 absolute z-[1] rounded-full -bottom-20 -left-16 blur-sm opacity-90" />
       <div className="pointer-events-none w-32 h-20 bg-white absolute z-[1] rounded-full bottom-2 left-24 opacity-25 blur-md" />
       <div className="pointer-events-none w-28 h-16 bg-white absolute z-[1] rounded-full bottom-8 left-48 opacity-20 blur-md" />
@@ -201,12 +190,12 @@ export function FullScreenSignup({
       </div>
 
       {/* Right column — form */}
-      <div className="p-8 md:p-12 md:w-1/2 flex flex-col bg-secondary text-secondary-foreground relative z-[20] overflow-y-auto">
+      <div className="p-8 md:p-12 md:w-1/2 flex flex-col bg-black text-white relative z-[20] overflow-y-auto">
         {!embedded && (
           <button
             type="button"
             onClick={close}
-            className="absolute right-4 top-4 rounded-lg p-2 text-neutral-500 transition hover:bg-black/5 hover:text-neutral-800"
+            className="absolute right-4 top-4 rounded-lg p-2 text-neutral-400 transition hover:bg-white/10 hover:text-white"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -217,10 +206,10 @@ export function FullScreenSignup({
           <div className="text-orange-500 mb-4">
             <Sunburst className="h-10 w-10" strokeWidth={1.5} />
           </div>
-          <h2 className="text-3xl font-medium mb-2 tracking-tight text-secondary-foreground">
+          <h2 className="text-3xl font-medium mb-2 tracking-tight text-white">
             {mode === "signup" ? "Get started" : "Welcome back"}
           </h2>
-          <p className="text-left text-neutral-600 text-sm md:text-base">
+          <p className="text-left text-neutral-400 text-sm md:text-base">
             {mode === "signup"
               ? "Create your NormClaim account — choose your role and sign up."
               : "Sign in to continue to your dashboard."}
@@ -237,8 +226,8 @@ export function FullScreenSignup({
             className={cn(
               "flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition border",
               mode === "signin"
-                ? "border-orange-500 bg-orange-50 text-orange-700"
-                : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300"
+                ? "border-orange-500 bg-orange-500/20 text-orange-400"
+                : "border-neutral-700 bg-neutral-900 text-neutral-400 hover:border-neutral-500"
             )}
           >
             <LogIn className="h-4 w-4" />
@@ -253,8 +242,8 @@ export function FullScreenSignup({
             className={cn(
               "flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition border",
               mode === "signup"
-                ? "border-orange-500 bg-orange-50 text-orange-700"
-                : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300"
+                ? "border-orange-500 bg-orange-500/20 text-orange-400"
+                : "border-neutral-700 bg-neutral-900 text-neutral-400 hover:border-neutral-500"
             )}
           >
             <UserPlus className="h-4 w-4" />
@@ -262,7 +251,7 @@ export function FullScreenSignup({
           </button>
         </div>
 
-        <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">
+        <p className="text-xs font-medium text-neutral-400 uppercase tracking-wide mb-2">
           Role
         </p>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 mb-6">
@@ -277,8 +266,8 @@ export function FullScreenSignup({
                 className={cn(
                   "flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-center text-[11px] font-medium transition",
                   active
-                    ? "border-orange-500 bg-orange-50 text-orange-900"
-                    : "border-neutral-200 bg-white text-neutral-600 hover:border-orange-200"
+                    ? "border-orange-500 bg-orange-500/20 text-orange-400"
+                    : "border-neutral-700 bg-neutral-900 text-neutral-400 hover:border-orange-500/50"
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" />
@@ -295,7 +284,7 @@ export function FullScreenSignup({
         >
           {mode === "signup" && (
             <div>
-              <label htmlFor="nc-name" className="block text-sm mb-2 font-medium">
+              <label htmlFor="nc-name" className="block text-sm mb-2 font-medium text-neutral-300">
                 Full name
               </label>
               <div className="relative">
@@ -308,8 +297,8 @@ export function FullScreenSignup({
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Dr. Mehta"
                   className={cn(
-                    "text-sm w-full py-2.5 pl-10 pr-3 border rounded-lg focus:outline-none focus:ring-2 bg-white text-neutral-900 focus:ring-orange-500/40 focus:border-orange-500",
-                    fieldErrors.name ? "border-red-500" : "border-neutral-300"
+                    "text-sm w-full py-2.5 pl-10 pr-3 border rounded-lg focus:outline-none focus:ring-2 bg-neutral-900 text-white placeholder:text-neutral-500 focus:ring-orange-500/40 focus:border-orange-500",
+                    fieldErrors.name ? "border-red-500" : "border-neutral-700"
                   )}
                 />
               </div>
@@ -320,7 +309,7 @@ export function FullScreenSignup({
           )}
 
           <div>
-            <label htmlFor="nc-email" className="block text-sm mb-2 font-medium">
+            <label htmlFor="nc-email" className="block text-sm mb-2 font-medium text-neutral-300">
               Your email
             </label>
             <input
@@ -332,8 +321,8 @@ export function FullScreenSignup({
               onChange={(e) => setEmail(e.target.value)}
               aria-invalid={!!fieldErrors.email}
               className={cn(
-                "text-sm w-full py-2 px-3 border rounded-lg focus:outline-none focus:ring-2 bg-white text-neutral-900 focus:ring-orange-500/40 focus:border-orange-500",
-                fieldErrors.email ? "border-red-500" : "border-neutral-300"
+                "text-sm w-full py-2 px-3 border rounded-lg focus:outline-none focus:ring-2 bg-neutral-900 text-white placeholder:text-neutral-500 focus:ring-orange-500/40 focus:border-orange-500",
+                fieldErrors.email ? "border-red-500" : "border-neutral-700"
               )}
             />
             {fieldErrors.email && (
@@ -344,7 +333,7 @@ export function FullScreenSignup({
           </div>
 
           <div>
-            <label htmlFor="nc-password" className="block text-sm mb-2 font-medium">
+            <label htmlFor="nc-password" className="block text-sm mb-2 font-medium text-neutral-300">
               {mode === "signup" ? "Create password" : "Password"}
             </label>
             <div className="relative">
@@ -358,10 +347,10 @@ export function FullScreenSignup({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={cn(
-                  "text-sm w-full py-2.5 pl-10 pr-3 border rounded-lg focus:outline-none focus:ring-2 bg-white text-neutral-900 focus:ring-orange-500/40 focus:border-orange-500",
+                  "text-sm w-full py-2.5 pl-10 pr-3 border rounded-lg focus:outline-none focus:ring-2 bg-neutral-900 text-white placeholder:text-neutral-500 focus:ring-orange-500/40 focus:border-orange-500",
                   fieldErrors.password
                     ? "border-red-500"
-                    : "border-neutral-300"
+                    : "border-neutral-700"
                 )}
               />
             </div>
@@ -374,7 +363,7 @@ export function FullScreenSignup({
             <div>
               <label
                 htmlFor="nc-confirm"
-                className="block text-sm mb-2 font-medium"
+                className="block text-sm mb-2 font-medium text-neutral-300"
               >
                 Confirm password
               </label>
@@ -387,10 +376,10 @@ export function FullScreenSignup({
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   className={cn(
-                    "text-sm w-full py-2.5 pl-10 pr-3 border rounded-lg focus:outline-none focus:ring-2 bg-white text-neutral-900 focus:ring-orange-500/40 focus:border-orange-500",
+                    "text-sm w-full py-2.5 pl-10 pr-3 border rounded-lg focus:outline-none focus:ring-2 bg-neutral-900 text-white placeholder:text-neutral-500 focus:ring-orange-500/40 focus:border-orange-500",
                     fieldErrors.confirm
                       ? "border-red-500"
-                      : "border-neutral-300"
+                      : "border-neutral-700"
                   )}
                 />
               </div>
@@ -429,7 +418,7 @@ export function FullScreenSignup({
             )}
           </button>
 
-          <div className="text-center text-neutral-600 text-sm">
+          <div className="text-center text-neutral-400 text-sm">
             {mode === "signup" ? (
               <>
                 Already have an account?{" "}

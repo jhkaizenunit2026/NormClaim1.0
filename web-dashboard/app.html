@@ -163,17 +163,26 @@
     // Try WebSocket connection
     SocketManager.connect();
 
-    // Default route
-    if (!window.location.hash || window.location.hash === '#/') {
-      if (AuthStore.isLoggedIn()) {
-        const r = AuthStore.getRole();
-        if (r === ROLES.HOSPITAL) Router.navigate('portal/cases');
-        else if (r === ROLES.TPA) Router.navigate('tpa/queue');
-        else Router.navigate('finance/alerts');
-      } else {
-        Router.navigate('login');
+    // AuthStore.init() is async (Supabase session restore) — await before routing
+    (async () => {
+      try {
+        await AuthStore.init();
+      } catch (e) {
+        console.warn('[Boot] Auth init error:', e.message);
       }
-    }
+
+      // Default route (after auth is resolved)
+      if (!window.location.hash || window.location.hash === '#/') {
+        if (AuthStore.isLoggedIn()) {
+          const r = AuthStore.getRole();
+          if (r === ROLES.HOSPITAL) Router.navigate('portal/cases');
+          else if (r === ROLES.TPA) Router.navigate('tpa/queue');
+          else Router.navigate('finance/alerts');
+        } else {
+          Router.navigate('login');
+        }
+      }
+    })();
   </script>
   <script type="module" src="assets/beams-bg.js"></script>
   <script type="module" src="assets/stat-cards.js"></script>

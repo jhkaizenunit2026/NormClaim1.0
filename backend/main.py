@@ -59,6 +59,7 @@ from routers.analytics import router as analytics_router
 from routers.auth import router as auth_router
 from routers.config import router as config_router
 from routers.claims import router as claims_router
+from routers.notifications import router as notifications_router
 from Extraction_pipeline.router import router as preauth_router
 
 app.include_router(documents_router)
@@ -72,6 +73,7 @@ app.include_router(validate_router)
 app.include_router(auth_router)
 app.include_router(config_router)
 app.include_router(claims_router)
+app.include_router(notifications_router)
 app.include_router(preauth_router, prefix="/api/preauth", tags=["pre-auth"])
 
 
