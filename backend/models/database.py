@@ -9,7 +9,18 @@ import logging
 import json
 from dotenv import load_dotenv
 
-from sqlalchemy import create_engine, Column, String, DateTime, Boolean, Float, Integer, Text, LargeBinary
+from sqlalchemy import (
+    JSON,
+    create_engine,
+    Column,
+    String,
+    DateTime,
+    Boolean,
+    Float,
+    Integer,
+    Text,
+    LargeBinary,
+)
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
@@ -109,6 +120,90 @@ class ClaimRecord(Base):
     timeline_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class AdmissionRecord(Base):
+    """Inpatient admission created after pre-auth approval (Stage 3)."""
+
+    __tablename__ = "admissions"
+
+    id = Column(String, primary_key=True, index=True)
+    admission_number = Column(String(64), unique=True, nullable=False, index=True)
+    patient_id = Column(String, nullable=False, index=True)
+    pre_auth_id = Column(String, nullable=True, index=True)
+    admitted_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    discharge_at = Column(DateTime, nullable=True)
+    status = Column(String(32), default="admitted", nullable=False)
+    created_by = Column(String, nullable=True)
+
+
+class EnhancementRequestRecord(Base):
+    """AI-generated insurance enhancement request / TPA response (Stage 4)."""
+
+    __tablename__ = "enhancement_requests"
+
+    id = Column(String, primary_key=True, index=True)
+    admission_id = Column(String, nullable=False, index=True)
+    original_amount = Column(Float, nullable=True)
+    suggested_amount = Column(Float, nullable=True)
+    justification_text = Column(Text, nullable=True)
+    severity_score = Column(Float, nullable=True)
+    cost_breakdown = Column(JSON, nullable=True)
+    status = Column(String(32), default="draft", nullable=False)
+    tpa_response = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class DispatchRecord(Base):
+    """Hard-copy / email dispatch of final claim PDF (Stage 7)."""
+
+    __tablename__ = "dispatch_records"
+
+    id = Column(String, primary_key=True, index=True)
+    admission_id = Column(String, nullable=False, index=True)
+    recipient_email = Column(String(512), nullable=False)
+    pdf_storage_key = Column(String(1024), nullable=True)
+    dispatch_status = Column(String(32), default="pending", nullable=False)
+    dispatched_at = Column(DateTime, nullable=True)
+    delivered_at = Column(DateTime, nullable=True)
+
+
+class SettlementRecord(Base):
+    """Parsed TPA settlement letter fields (Stage 8)."""
+
+    __tablename__ = "settlement_records"
+
+    id = Column(String, primary_key=True, index=True)
+    admission_id = Column(String, nullable=True, index=True)
+    utr_number = Column(String(128), nullable=True)
+    settlement_amount = Column(Float, nullable=True)
+    tds_amount = Column(Float, nullable=True)
+    deductions = Column(JSON, nullable=True)
+    final_payable = Column(Float, nullable=True)
+    settlement_date = Column(String(64), nullable=True)
+    remarks = Column(Text, nullable=True)
+    confidence = Column(Float, nullable=True)
+    parsed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class FinanceReconciliationRecord(Base):
+    """Settlement vs expected reconciliation (Stage 9)."""
+
+    __tablename__ = "finance_reconciliations"
+
+    id = Column(String, primary_key=True, index=True)
+    admission_id = Column(String, nullable=False, index=True)
+    expected_amount = Column(Float, nullable=True)
+    received_amount = Column(Float, nullable=True)
+    delta = Column(Float, nullable=True)
+    mismatch_category = Column(String(64), nullable=True)
+    deductions_analysis = Column(JSON, nullable=True)
+    recommendations = Column(JSON, nullable=True)
+    fraud_risk_score = Column(Float, nullable=True)
+    confidence = Column(Float, nullable=True)
+    status = Column(String(32), default="pending", nullable=False)
+    resolved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 # Create all tables (safe to run repeatedly — ignores existing tables)

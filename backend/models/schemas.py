@@ -3,8 +3,8 @@ NormClaim — Pydantic Data Models
 All I/O schemas for the NormClaim API.
 """
 
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from pydantic import BaseModel, EmailStr, Field
+from typing import Any, List, Optional, Dict
 
 
 class PatientInfo(BaseModel):
@@ -148,6 +148,217 @@ class DocumentListResponse(BaseModel):
     """Response for list-all-documents endpoint."""
     documents: List[DocumentMeta]
     total: int
+
+
+class AdmissionCreatedResponse(BaseModel):
+    admission_id: str
+    admission_number: str
+    pre_auth_form_id: str
+    patient_id: str
+    message: str
+    already_existed: bool = False
+
+
+class AdmissionDetailResponse(BaseModel):
+    id: str
+    admission_number: str
+    patient_id: str
+    pre_auth_form_id: Optional[str] = None
+    admitted_at: Optional[str] = None
+    discharge_at: Optional[str] = None
+    status: str = "admitted"
+    created_by: Optional[str] = None
+
+
+class EnhancementGenerateRequest(BaseModel):
+    diagnosis_data: List[Dict[str, Any]] = Field(default_factory=list)
+    procedures: List[Dict[str, Any]] = Field(default_factory=list)
+    requested_amount: float = Field(..., gt=0, description="Current / original approved amount in INR")
+
+
+class EnhancementGeneratedPayload(BaseModel):
+    justification_text: str
+    suggested_amount: float
+    severity_score: float
+    historical_approval_rate: float
+    cost_breakdown: Dict[str, Any] = Field(default_factory=dict)
+    supporting_codes: List[str] = Field(default_factory=list)
+    confidence: float
+
+
+class EnhancementCreateResponse(BaseModel):
+    enhancement_id: str
+    admission_id: str
+    status: str = "draft"
+    original_amount: float
+    payload: EnhancementGeneratedPayload
+
+
+class EnhancementDetailResponse(BaseModel):
+    id: str
+    admission_id: str
+    original_amount: Optional[float] = None
+    suggested_amount: Optional[float] = None
+    justification_text: Optional[str] = None
+    severity_score: Optional[float] = None
+    cost_breakdown: Dict[str, Any] = Field(default_factory=dict)
+    status: str = "draft"
+    tpa_response: Dict[str, Any] = Field(default_factory=dict)
+    created_at: Optional[str] = None
+
+
+class EnhancementTPAUpdateRequest(BaseModel):
+    tpa_response: Dict[str, Any] = Field(default_factory=dict)
+    status: Optional[str] = Field(
+        default=None,
+        description="draft | submitted | approved | rejected",
+    )
+
+
+class BillBreakdown(BaseModel):
+    """Structured hospital bill split at discharge (Stage 5)."""
+
+    room_charges: float = 0
+    medicines: float = 0
+    procedures: float = 0
+    investigations: float = 0
+    doctor_fees: float = 0
+    nursing_charges: float = 0
+    consumables: float = 0
+    total: float = 0
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class DischargeProcessRequest(BaseModel):
+    document_id: Optional[str] = Field(
+        default=None,
+        description="Discharge document id if POST /api/extract was run for a PDF summary",
+    )
+    bill_notes: Optional[str] = Field(
+        default=None,
+        description="Optional bill / charge notes for Gemini breakdown",
+    )
+
+
+class DischargeProcessResponse(BaseModel):
+    admission_id: str
+    discharge_summary: Dict[str, Any]
+    fhir_bundle: Dict[str, Any]
+    bill_breakdown: BillBreakdown
+    icp_generated: bool
+    fhir_source: str
+
+
+class DischargeOptimizeRequest(BaseModel):
+    bill_breakdown: Optional[BillBreakdown] = None
+    diagnoses: List[Dict[str, Any]] = Field(default_factory=list)
+    los_days: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=365,
+        description="Length of stay in days; inferred from admission when omitted",
+    )
+
+
+class ValidDeductionItem(BaseModel):
+    description: str
+    amount: float
+    reason: str
+
+
+class DischargeOptimizeResponse(BaseModel):
+    admission_id: str
+    predicted_copay: float
+    valid_deductions: List[ValidDeductionItem]
+    approval_probability: float
+    optimized_claim_amount: float
+    flags: List[str]
+    estimated_tpa_time_minutes: int
+    policy_snapshot: Dict[str, Any] = Field(default_factory=dict)
+
+
+class DispatchRequest(BaseModel):
+    recipient_email: EmailStr
+    send_email: bool = Field(
+        default=True,
+        description="If false, only generate PDF and store metadata (no SMTP)",
+    )
+
+
+class DispatchResponse(BaseModel):
+    dispatch_id: str
+    admission_id: str
+    recipient_email: str
+    pdf_storage_key: Optional[str] = None
+    dispatch_status: str
+    dispatched_at: Optional[str] = None
+    delivered_at: Optional[str] = None
+    email_detail: Dict[str, Any] = Field(default_factory=dict)
+
+
+class SettlementDeductionItem(BaseModel):
+    description: str
+    amount: float
+    reason: Optional[str] = None
+
+
+class SettlementLetterExtraction(BaseModel):
+    """Structured fields extracted from a TPA settlement letter."""
+
+    utr_number: Optional[str] = None
+    settlement_amount: Optional[float] = None
+    tds_amount: Optional[float] = None
+    deductions: List[SettlementDeductionItem] = Field(default_factory=list)
+    final_payable: Optional[float] = None
+    settlement_date: Optional[str] = None
+    remarks: Optional[str] = None
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class SettlementParseResponse(BaseModel):
+    settlement_id: Optional[str] = None
+    admission_id: Optional[str] = None
+    persisted: bool
+    extraction: SettlementLetterExtraction
+
+
+class SettlementRecordResponse(BaseModel):
+    id: str
+    admission_id: Optional[str] = None
+    utr_number: Optional[str] = None
+    settlement_amount: Optional[float] = None
+    tds_amount: Optional[float] = None
+    deductions: List[SettlementDeductionItem] = Field(default_factory=list)
+    final_payable: Optional[float] = None
+    settlement_date: Optional[str] = None
+    remarks: Optional[str] = None
+    confidence: Optional[float] = None
+    parsed_at: Optional[str] = None
+
+
+class FinanceReconcileRequest(BaseModel):
+    expected_amount: float = Field(..., gt=0, description="Hospital expected / claimed amount in INR")
+    bill_breakdown: Dict[str, Any] = Field(default_factory=dict)
+    diagnoses: List[Dict[str, Any]] = Field(default_factory=list)
+    settlement_override: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Optional raw settlement fields if no settlement_records row exists",
+    )
+
+
+class FinanceReconcileResponse(BaseModel):
+    reconciliation_id: str
+    admission_id: str
+    expected_amount: float
+    received_amount: float
+    delta: float
+    raise_flag: bool
+    mismatch_category: str
+    deductions_analysis: List[Dict[str, Any]] = Field(default_factory=list)
+    recommendations: List[str] = Field(default_factory=list)
+    fraud_risk_score: float
+    confidence: float
+    status: str = "pending"
 
 
 class ClaimCreateRequest(BaseModel):

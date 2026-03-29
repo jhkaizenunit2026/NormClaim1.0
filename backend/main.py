@@ -9,7 +9,7 @@ Run with: uvicorn main:app --reload --port 8000
 import os
 import logging
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from supabase import create_client, Client
@@ -59,6 +59,12 @@ from routers.analytics import router as analytics_router
 from routers.auth import router as auth_router
 from routers.config import router as config_router
 from routers.claims import router as claims_router
+from routers.admissions import router as admissions_router
+from routers.enhancements import router as enhancements_router
+from routers.discharge import router as discharge_router
+from routers.dispatch import router as dispatch_router
+from routers.settlements import router as settlements_router
+from routers.finance_recon import router as finance_recon_router
 from routers.notifications import router as notifications_router
 from Extraction_pipeline.router import router as preauth_router
 
@@ -73,6 +79,12 @@ app.include_router(validate_router)
 app.include_router(auth_router)
 app.include_router(config_router)
 app.include_router(claims_router)
+app.include_router(admissions_router)
+app.include_router(enhancements_router)
+app.include_router(discharge_router)
+app.include_router(dispatch_router)
+app.include_router(settlements_router)
+app.include_router(finance_recon_router)
 app.include_router(notifications_router)
 app.include_router(preauth_router, prefix="/api/preauth", tags=["pre-auth"])
 
@@ -114,6 +126,41 @@ async def health():
         "gemini_api_key_configured": gemini_configured,
         "supabase_configured": supabase_configured,
     }
+
+
+@app.get("/health/gemini", tags=["System"])
+async def health_gemini():
+    """
+    Live Gemini check (one short model call). Use after rotating keys or to confirm quota.
+    """
+    from services.extractor import (
+        GeminiQuotaExceededError,
+        probe_gemini_api_key,
+        resolved_gemini_model,
+    )
+
+    try:
+        probe = probe_gemini_api_key()
+        return {"status": "ok", **probe}
+    except GeminiQuotaExceededError as e:
+        detail: dict = {
+            "code": "GEMINI_QUOTA_EXHAUSTED",
+            "message": str(e),
+            "model": resolved_gemini_model(),
+        }
+        if e.provider_details:
+            detail["provider_details"] = e.provider_details
+        raise HTTPException(status_code=503, detail=detail)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "GEMINI_NOT_CONFIGURED", "message": str(e)},
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "GEMINI_PROBE_FAILED", "message": str(e)},
+        )
 
 
 # ── Startup event ────────────────────────────────────────────────────────

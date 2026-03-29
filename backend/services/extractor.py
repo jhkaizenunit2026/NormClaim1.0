@@ -17,6 +17,7 @@ from typing import Dict, List
 from dotenv import load_dotenv
 
 from google import genai
+from google.genai.errors import ClientError, ServerError
 from rapidfuzz import process, fuzz
 
 from models.schemas import (
@@ -44,7 +45,46 @@ with open(os.path.join(_DATA_DIR, "drug_map.json"), "r", encoding="utf-8") as f:
 ICD10_CODES = list(ICD10_LOOKUP.keys())
 MAX_RETRIES = 3
 RETRY_DELAYS = [2, 4, 8]
-GEMINI_MODEL = "gemini-2.5-flash-lite"
+# Longer backoff when the provider returns 429 (rate limit / quota).
+RATE_LIMIT_RETRY_DELAYS = [8, 24, 60]
+_DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
+
+
+def resolved_gemini_model() -> str:
+    """Model id for generate_content; override with env GEMINI_MODEL (e.g. gemini-2.0-flash)."""
+    raw = (os.environ.get("GEMINI_MODEL") or _DEFAULT_GEMINI_MODEL).strip()
+    return raw or _DEFAULT_GEMINI_MODEL
+
+
+def _provider_error_details(exc: ClientError) -> dict | None:
+    """Structured body from the SDK (often lists which limit tripped: RPM, RPD, etc.)."""
+    d = getattr(exc, "details", None)
+    if not isinstance(d, dict):
+        return None
+    try:
+        blob = json.dumps(d, default=str)
+    except (TypeError, ValueError):
+        return {"_unserializable": str(d)[:1500]}
+    if len(blob) > 4000:
+        return {"truncated": True, "preview": blob[:4000]}
+    return d
+
+
+class GeminiQuotaExceededError(RuntimeError):
+    """Raised when Gemini returns 429 RESOURCE_EXHAUSTED after retries."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        http_status: int | None = 429,
+        provider_status: str | None = None,
+        provider_details: dict | None = None,
+    ):
+        super().__init__(message)
+        self.http_status = http_status
+        self.provider_status = provider_status
+        self.provider_details = provider_details
 
 FEW_SHOT_EXAMPLES = r"""
 EXAMPLE (discharge summary style — mirror this structure):
@@ -125,6 +165,39 @@ def _extract_response_text(response: object) -> str:
     return "\n".join(chunks).strip()
 
 
+def _should_retry_gemini_call(exc: BaseException) -> bool:
+    """Retry server errors and 429; fail fast on other 4xx client errors."""
+    if isinstance(exc, ServerError):
+        return True
+    if isinstance(exc, ClientError):
+        return exc.code == 429
+    return True
+
+
+def _parse_retry_after_seconds(exc: ClientError) -> float | None:
+    resp = getattr(exc, "response", None)
+    if resp is None or not hasattr(resp, "headers"):
+        return None
+    raw = resp.headers.get("Retry-After")
+    if not raw:
+        return None
+    try:
+        return float(str(raw).strip())
+    except ValueError:
+        return None
+
+
+def _retry_sleep_seconds(attempt: int, exc: BaseException) -> float:
+    if isinstance(exc, ClientError) and exc.code == 429:
+        ra = _parse_retry_after_seconds(exc)
+        if ra is not None:
+            return min(max(ra, 1.0), 120.0)
+        idx = min(attempt, len(RATE_LIMIT_RETRY_DELAYS) - 1)
+        return float(RATE_LIMIT_RETRY_DELAYS[idx])
+    idx = min(attempt, len(RETRY_DELAYS) - 1)
+    return float(RETRY_DELAYS[idx])
+
+
 def _normalize_low_confidence_flags(value: object) -> list[str]:
     """Coerce model output into a stable list[str] for schema validation."""
     if value is None:
@@ -140,11 +213,11 @@ def _normalize_low_confidence_flags(value: object) -> list[str]:
 
 
 def _call_gemini_with_retry(client: genai.Client, prompt_text: str) -> Dict:
-    last_error = None
+    last_error: BaseException | None = None
     for attempt in range(MAX_RETRIES):
         try:
             response = client.models.generate_content(
-                model=GEMINI_MODEL,
+                model=resolved_gemini_model(),
                 contents=prompt_text,
                 config={"temperature": 0.1},
             )
@@ -154,11 +227,84 @@ def _call_gemini_with_retry(client: genai.Client, prompt_text: str) -> Dict:
             return _parse_json(raw)
         except Exception as e:
             last_error = e
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(RETRY_DELAYS[attempt])
+            if attempt >= MAX_RETRIES - 1:
+                break
+            if not _should_retry_gemini_call(e):
+                break
+            delay = _retry_sleep_seconds(attempt, e)
+            if isinstance(e, ClientError) and e.code == 429:
+                logger.warning(
+                    "Gemini HTTP 429 (attempt %s/%s), retry in %.1fs; model=%s details=%s",
+                    attempt + 1,
+                    MAX_RETRIES,
+                    delay,
+                    resolved_gemini_model(),
+                    _provider_error_details(e),
+                )
             else:
-                logger.error("Gemini API failed after retries: %s", e)
+                logger.warning(
+                    "Gemini call failed (attempt %s/%s), retrying in %.1fs: %s",
+                    attempt + 1,
+                    MAX_RETRIES,
+                    delay,
+                    e,
+                )
+            time.sleep(delay)
+
+    if last_error is not None:
+        if isinstance(last_error, ClientError) and last_error.code == 429:
+            model_id = resolved_gemini_model()
+            details = _provider_error_details(last_error)
+            msg = (
+                "Gemini returned HTTP 429 RESOURCE_EXHAUSTED. This often means per-minute / per-day "
+                "caps on the free tier, billing not linked to the Cloud project, or the model not "
+                "enabled for this key—not only 'monthly quota used up'. "
+                f"model={model_id!r} status={last_error.status!r} message={last_error.message!r}. "
+                "Try GEMINI_MODEL=gemini-2.0-flash in .env, space out requests, and confirm billing "
+                "in Google AI Studio / Cloud console."
+            )
+            logger.error(
+                "Gemini 429 after retries model=%s details=%s",
+                model_id,
+                details,
+            )
+            raise GeminiQuotaExceededError(
+                msg,
+                http_status=429,
+                provider_status=last_error.status,
+                provider_details=details,
+            ) from last_error
+        logger.error("Gemini API failed after retries: %s", last_error)
     raise RuntimeError("Gemini API call failed") from last_error
+
+
+def probe_gemini_api_key() -> Dict[str, str]:
+    """
+    One minimal generateContent call to verify the key and current quota.
+    Consumes a small amount of API quota.
+    """
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY environment variable is not set")
+    client = genai.Client(api_key=api_key)
+    try:
+        response = client.models.generate_content(
+            model=resolved_gemini_model(),
+            contents='Reply with exactly the word "ok".',
+            config={"temperature": 0.0, "max_output_tokens": 8},
+        )
+        text = _extract_response_text(response)
+    except ClientError as e:
+        if e.code == 429:
+            raise GeminiQuotaExceededError(
+                "Gemini probe failed: HTTP 429 (see provider_details for limit type). "
+                "Common on new keys: free-tier RPM/RPD, or billing not enabled for the API.",
+                http_status=429,
+                provider_status=e.status,
+                provider_details=_provider_error_details(e),
+            ) from e
+        raise
+    return {"status": "ok", "model": resolved_gemini_model(), "sample": (text or "")[:80]}
 
 
 def extract_from_document(file_bytes: bytes, document_id: str) -> ExtractionResult:
@@ -195,6 +341,7 @@ def extract_from_document(file_bytes: bytes, document_id: str) -> ExtractionResu
         raise ValueError("GEMINI_API_KEY environment variable is not set")
 
     client = genai.Client(api_key=api_key)
+    logger.info("Gemini extract using model=%s", resolved_gemini_model())
     raw_text = extract_text_from_pdf(file_bytes)
 
     if not raw_text or len(raw_text) < 100:
