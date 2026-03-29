@@ -79,7 +79,7 @@ confidence: your confidence in the category and advice (0.0–1.0).
         try:
             self.db.table("audit_logs").insert(row).execute()
         except Exception as exc:
-            logger.error("audit_log write failed: %s", exc)
+            logger.exception("audit_log write failed")
 
     @staticmethod
     def _coerce_settlement(row: dict) -> SettlementLetterExtraction:

@@ -88,7 +88,7 @@ Rules:
         try:
             self.db.table("audit_logs").insert(row).execute()
         except Exception as exc:
-            logger.error("audit_log write failed: %s", exc)
+            logger.exception("audit_log write failed")
 
     def _historical_approval_rate(self) -> float:
         """RAG-lite: empirical approval share from past enhancement rows (stub fallback)."""

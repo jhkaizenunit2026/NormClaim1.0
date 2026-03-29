@@ -243,7 +243,7 @@ def bootstrap_memory_caches() -> None:
             DOCUMENTS[doc.id] = {
                 "filename": doc.filename,
                 "size": doc.file_size_bytes or 0,
-                "bytes": doc.file_blob,
+                "bytes": None,  # loaded on demand by hydrate_document_for_extract
             }
         for ex in db.query(ExtractionRecord).all():
             try:

@@ -82,7 +82,7 @@ Rules:
         try:
             self.db.table("audit_logs").insert(row).execute()
         except Exception as exc:
-            logger.error("audit_log write failed: %s", exc)
+            logger.exception("audit_log write failed")
 
     def _fetch_admission(self, admission_id: str) -> dict | None:
         resp = (

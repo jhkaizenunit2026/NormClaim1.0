@@ -107,7 +107,7 @@ async def upload_document(
                 document_id=doc_id,
                 filename=filename,
                 file_bytes=file_bytes,
-                consent_obtained=True,
+                consent_obtained=consent_obtained,
                 storage_key=storage_key,
             )
     except Exception as e:
@@ -118,7 +118,7 @@ async def upload_document(
         document_id=doc_id,
         filename=filename,
         status="uploaded",
-        consent_obtained=True,
+        consent_obtained=consent_obtained,
         uploaded_at=uploaded_at.isoformat() + "Z",
         message="Document uploaded successfully. Ready for extraction.",
     )

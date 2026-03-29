@@ -82,20 +82,21 @@ def _assert_can_access_pre_auth_form(supabase: Any, pre_auth_form_id: str, curre
         raise HTTPException(status_code=403, detail="Not authorized to access this pre-auth form")
 
     patient_id = form_row.get("patient_id")
-    if patient_id:
-        patient_resp = (
-            supabase.table("patients")
-            .select("*")
-            .eq("id", patient_id)
-            .single()
-            .execute()
-        )
-        patient_row = patient_resp.data or {}
-        patient_owner = _find_owner_user_id(patient_row)
-        if patient_owner is not None:
-            if patient_owner == current_user_id:
-                return form_row
-            raise HTTPException(status_code=403, detail="Not authorized to access this pre-auth form")
+    if not patient_id:
+        raise HTTPException(status_code=422, detail="pre_auth_form has no patient_id")
+    patient_resp = (
+        supabase.table("patients")
+        .select("*")
+        .eq("id", patient_id)
+        .single()
+        .execute()
+    )
+    patient_row = patient_resp.data or {}
+    patient_owner = _find_owner_user_id(patient_row)
+    if patient_owner is not None:
+        if patient_owner == current_user_id:
+            return form_row
+        raise HTTPException(status_code=403, detail="Not authorized to access this pre-auth form")
 
     logger.warning(
         "Denied pre-auth access because no owner mapping is available: form=%s user=%s",
