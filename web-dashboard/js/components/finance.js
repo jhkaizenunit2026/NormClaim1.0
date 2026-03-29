@@ -122,7 +122,11 @@ const FinanceComponents = {
       remarks: document.getElementById('le-remarks')?.value,
     };
     if (!data.account || !data.amount) { showToast('Please fill all required fields', 'error'); return; }
-    try { await Api.recordFinanceEntry(claimId, data); } catch(e) {}
+    try { await Api.recordFinanceEntry(claimId, data); }
+    catch(e) {
+      showToast(e?.message || 'Failed to record ledger entry', 'error');
+      return;
+    }
     showToast('Ledger entry recorded!', 'success');
     setTimeout(() => Router.navigate('finance/alerts'), 800);
   },
@@ -180,7 +184,11 @@ const FinanceComponents = {
   },
 
   async _closeClaim(claimId) {
-    try { await Api.closeClaim(claimId); } catch(e) {}
+    try { await Api.closeClaim(claimId); }
+    catch(e) {
+      showToast(e?.message || 'Failed to close case', 'error');
+      return;
+    }
     showToast('Case closed and archived', 'success');
     setTimeout(() => FinanceComponents._loadRecon(), 500);
   },

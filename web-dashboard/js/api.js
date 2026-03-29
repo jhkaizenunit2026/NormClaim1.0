@@ -8,6 +8,20 @@ const API_BASE = window.NormClaimSupabase?.getApiBase?.() || (
 );
 
 const Api = {
+  _sanitizeForHtml(input) {
+    if (input == null) return input;
+    if (typeof input === 'string') return escapeHtml(input);
+    if (Array.isArray(input)) return input.map(v => this._sanitizeForHtml(v));
+    if (typeof input === 'object') {
+      const out = {};
+      for (const [k, v] of Object.entries(input)) {
+        out[k] = this._sanitizeForHtml(v);
+      }
+      return out;
+    }
+    return input;
+  },
+
   _getHeaders() {
     const h = { 'Content-Type': 'application/json' };
     const user = AuthStore.getUser();
@@ -29,7 +43,8 @@ const Api = {
           const detail = err?.detail || err?.message || res.statusText || `HTTP ${res.status}`;
           throw new Error(detail);
         }
-        return await res.json();
+        const payload = await res.json();
+        return this._sanitizeForHtml(payload);
       } catch (e) {
         if (i === retries) throw e;
         await new Promise(r => setTimeout(r, 500 * (i + 1)));

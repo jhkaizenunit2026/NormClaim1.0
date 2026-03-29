@@ -114,7 +114,10 @@ const TPAComponents = {
   async _approvePreAuth(claimId) {
     try {
       await Api.updateClaimStatus(claimId, CLAIM_STATUS.PRE_AUTH_APPROVED, { amount: document.getElementById('rv-amount')?.value });
-    } catch(e) {}
+    } catch(e) {
+      showToast(e?.message || 'Failed to approve pre-auth', 'error');
+      return;
+    }
     showToast('Pre-auth approved!', 'success');
     setTimeout(() => Router.navigate('tpa/queue'), 800);
   },
@@ -199,7 +202,10 @@ const TPAComponents = {
         copay: document.getElementById('da-copay')?.value,
         payable: document.getElementById('da-payable')?.value,
       });
-    } catch(e) {}
+    } catch(e) {
+      showToast(e?.message || 'Failed to approve discharge', 'error');
+      return;
+    }
     showToast('Discharge approved!', 'success');
     setTimeout(() => Router.navigate('tpa/cases'), 800);
   },

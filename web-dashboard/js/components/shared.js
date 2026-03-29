@@ -62,7 +62,7 @@ const SharedComponents = {
         <div class="notif-dropdown-list">
           ${NotificationStore.getAll().slice(0, 20).map(n => `
             <div class="notif-item ${n.read ? '' : 'unread'} ${n.priority}" onclick="${n.claimId ? `Router.navigate('portal/claim/${n.claimId}')` : ''}">
-              <div class="notif-msg">${n.message}</div>
+              <div class="notif-msg">${escapeHtml(n.message)}</div>
               <div class="notif-time">${formatDateTime(n.timestamp)}</div>
             </div>
           `).join('') || '<div class="notif-item"><div class="notif-msg text-muted">No notifications</div></div>'}

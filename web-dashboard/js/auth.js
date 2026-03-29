@@ -33,8 +33,11 @@ const AuthStore = {
     // First sign in to validate credentials
     const session = LocalDB.signIn({ email, password });
 
-    // If a role was explicitly chosen, update the user's session role
-    const finalRole = role || session.role;
+    // Prevent client-side role escalation: selected role must match stored account role.
+    if (role && role !== session.role) {
+      throw new Error('Selected role does not match your account role.');
+    }
+    const finalRole = session.role;
 
     this._user = {
       id: session.userId,
