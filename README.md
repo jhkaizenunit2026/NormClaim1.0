@@ -24,10 +24,11 @@ PDF (discharge summary / lab report / bill)
   AI Extraction  →  FHIR R4 Bundle  →  Claim Gap Report + ₹ Delta
 ```
 
-1. **Ingest** — Upload any hospital document (PDF or scanned image)
-2. **Extract** — Gemini 1.5 Flash reads the document and returns structured JSON: patient, diagnoses with ICD-10 codes, procedures, medications, billed codes
+1. **Ingest** — Upload any hospital document (PDF or scanned image); consent is captured at upload time
+2. **Extract** — Gemini AI reads the document and returns structured JSON: patient, diagnoses with ICD-10 codes, procedures, medications, billed codes
 3. **Map** — HAPI FHIR Java service builds a valid ABDM-compliant FHIR R4 Bundle
 4. **Reconcile** — ICD-10 diff engine compares extracted diagnoses against billed codes, surfaces missed diagnoses and estimates the ₹ claim delta
+5. **Manage** — Full claim lifecycle management: pre-auth, discharge processing, settlement, and finance reconciliation — all behind role-based access control
 
 ---
 
@@ -45,50 +46,85 @@ PDF (discharge summary / lab report / bill)
 ## Repository Structure
 
 ```
-normclaim/
-├── backend/                        # FastAPI orchestration service (Python)
-│   ├── main.py                     # App entry point, all routes
-│   ├── routers/
-│   │   ├── documents.py            # POST /api/documents  (upload)
+NormClaim1.0/
+├── backend/                        # FastAPI orchestration service (Python 3.11)
+│   ├── main.py                     # App entry point + router registration
+│   ├── routers/                    # One file per API domain
+│   │   ├── documents.py            # POST /api/documents  (upload with consent)
 │   │   ├── extract.py              # POST /api/extract/{id}
 │   │   ├── fhir.py                 # POST /api/fhir/{id}
-│   │   └── reconcile.py            # POST /api/reconcile/{id}
-│   ├── services/
+│   │   ├── reconcile.py            # POST /api/reconcile/{id}
+│   │   ├── claims.py               # GET/POST/PATCH /api/claims (lifecycle)
+│   │   ├── auth.py                 # GET /api/auth/session
+│   │   ├── notifications.py        # WebSocket + REST notifications
+│   │   ├── discharge.py            # Discharge processing endpoints
+│   │   ├── enhancement.py          # AI-powered claim enhancement
+│   │   ├── settlement.py           # Settlement processing
+│   │   ├── finance.py              # Finance reconciliation
+│   │   ├── analytics.py            # Dashboard analytics
+│   │   ├── review.py               # Human-in-the-loop review
+│   │   ├── feedback.py             # Extraction feedback loop
+│   │   ├── validate.py             # Pre-submission validation
+│   │   └── config.py               # Public runtime config
+│   ├── Extraction_pipeline/        # Pre-auth + ABHA extraction module
+│   │   ├── extraction_pipeline.py  # Gemini-powered clinical entity extraction
+│   │   ├── abha_lookup.py          # ABHA ID lookup helpers
+│   │   ├── pre_auth_filling.py     # Pre-authorization form auto-fill
+│   │   ├── text_features.py        # NLP feature engineering
+│   │   └── router.py               # POST /api/preauth/…
+│   ├── services/                   # Business logic layer
 │   │   ├── extractor.py            # Gemini API + pdfplumber pipeline
 │   │   ├── fhir_client.py          # HTTP client → Java FHIR service
+│   │   ├── fhir_mapper.py          # FHIR resource builder helpers
 │   │   ├── reconciler.py           # ICD-10 diff + ₹ delta engine
-│   │   └── pdf_parser.py           # Text + image extraction from PDFs
+│   │   ├── pdf_parser.py           # Text + image extraction from PDFs
+│   │   ├── nlp_preprocessor.py     # spaCy / medspaCy pre-processing
+│   │   ├── claim_structuring.py    # Claim structuring & normalization
+│   │   ├── validation_service.py   # Claim validation rules
+│   │   ├── discharge_service.py    # Discharge document processing
+│   │   ├── enhancement_service.py  # AI claim enhancement
+│   │   ├── settlement_parser.py    # Settlement document parsing
+│   │   ├── finance_reconciler.py   # Finance reconciliation logic
+│   │   ├── analytics_service.py    # KPI + trend calculations
+│   │   ├── review_service.py       # Review workflow helpers
+│   │   ├── feedback_service.py     # Feedback storage & retrieval
+│   │   ├── persistence.py          # In-memory cache bootstrap
+│   │   └── auth.py                 # Supabase JWT verification
 │   ├── models/
 │   │   ├── schemas.py              # Pydantic models (all I/O types)
-│   │   └── database.py             # SQLAlchemy SQLite setup
+│   │   └── database.py             # SQLAlchemy ORM + Supabase setup
 │   ├── data/
-│   │   └── icd10_codes.json        # Local ICD-10 lookup (offline)
+│   │   ├── icd10_codes.json        # Local ICD-10 lookup (offline)
+│   │   ├── drug_map.json           # Drug name → code mapping
+│   │   └── abbrev_map.json         # Clinical abbreviation expansion
+│   ├── sql/
+│   │   ├── normclaim_full_schema.sql   # Full Supabase PostgreSQL schema
+│   │   └── seed_auth_users_dummy.sql   # Seed data for local dev
+│   ├── Dockerfile
 │   └── requirements.txt
 │
 ├── fhir-service/                   # HAPI FHIR Java Spring Boot microservice
 │   ├── pom.xml
-│   └── src/main/java/com/normclaim/fhir/
-│       ├── FhirApplication.java
-│       ├── controller/
-│       │   └── FhirController.java # POST /fhir/bundle
-│       └── service/
-│           └── BundleBuilderService.java   # Builds FHIR R4 Bundle
+│   └── Dockerfile
 │
 ├── android/                        # Android app (Java)
-│   └── app/src/main/java/com/normclaim/
-│       ├── MainActivity.java       # Document list + upload trigger
-│       ├── UploadActivity.java     # File pick → upload → extract flow
-│       ├── ResultActivity.java     # Entities tab + Claim Report tab
-│       └── network/
-│           └── ApiService.java     # Retrofit2 interface
+│   └── app/
 │
-├── web-dashboard/                  # Static HTML/CSS/JS dashboard
-│   ├── index.html                  # Document list + upload dropzone
-│   ├── review.html                 # 3-column: original | entities | FHIR
-│   ├── reconcile.html              # Claim gap report with ₹ delta table
-│   └── assets/
-│       ├── style.css
-│       └── app.js
+├── web-dashboard/                  # React + TypeScript + Vite SPA
+│   ├── index.html                  # App shell
+│   ├── app.html                    # Alternative static entry
+│   ├── src/                        # Vite-compiled React components
+│   ├── authentication/             # Auth components & Supabase hooks
+│   │   ├── AuthDialog.tsx          # Login / sign-up modal
+│   │   ├── RoleGuard.tsx           # Role-based route guard
+│   │   ├── NotificationBell.tsx    # Real-time notification bell
+│   │   ├── StageProgressBar.tsx    # Claim stage visualisation
+│   │   └── authStore.ts            # Zustand auth state
+│   ├── js/                         # Vanilla-JS modules (legacy dashboard)
+│   │   ├── api.js                  # Backend API client
+│   │   ├── auth.js                 # Supabase auth helpers
+│   │   └── notifications.js        # WebSocket notification client
+│   └── assets/                     # CSS + component bundles
 │
 ├── test-data/                      # Synthetic test documents
 │   ├── generate.py                 # Script to generate all PDFs
@@ -97,8 +133,10 @@ normclaim/
 │   ├── lab_report.pdf              # 8 lab values → FHIR Observations
 │   └── bill_undercoded.pdf         # Bill showing only J18.9
 │
+├── scripts/
+│   └── smoke_api.sh                # End-to-end API smoke test
+│
 ├── docker-compose.yml
-├── .env.example
 └── README.md
 ```
 
@@ -107,34 +145,46 @@ normclaim/
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Frontend                             │
-│   Android App (Java)          Web Dashboard (HTML/JS)       │
-│   MainActivity                index.html                    │
-│   UploadActivity              review.html                   │
-│   ResultActivity              reconcile.html                │
-└──────────────┬──────────────────────────┬───────────────────┘
-               │ Retrofit2                │ fetch()
-               ▼                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│               FastAPI Backend  :8000  (Python)              │
-│                                                             │
-│  POST /api/documents     →  store uploaded PDF              │
-│  POST /api/extract/{id}  →  run AI extraction pipeline      │
-│  POST /api/fhir/{id}     →  proxy to FHIR Java service      │
-│  POST /api/reconcile/{id}→  run ICD-10 diff + ₹ delta       │
-│  GET  /api/documents     →  list all documents + status     │
-└──────┬─────────────────────────────────┬────────────────────┘
-       │                                 │ httpx
-       ▼                                 ▼
-┌──────────────────┐          ┌──────────────────────────────┐
-│  Gemini 1.5 Flash│          │  HAPI FHIR Service  :8001    │
-│  + pdfplumber    │          │  (Java Spring Boot)          │
-│                  │          │                              │
-│  Text/image →    │          │  POST /fhir/bundle           │
-│  structured JSON │          │  → FHIR R4 Bundle JSON       │
-└──────────────────┘          └──────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                           Frontend                               │
+│  Android App (Java)        Web Dashboard (React / Vite / TS)     │
+│  Retrofit2 API client      Supabase Auth + WebSocket notifs      │
+└──────────┬─────────────────────────────────┬─────────────────────┘
+           │ HTTP (Bearer JWT)                │ HTTP / WS
+           ▼                                  ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                  FastAPI Backend  :8000  (Python 3.11)           │
+│                                                                  │
+│  /api/documents   upload (consent flag, multipart PDF)          │
+│  /api/extract     Gemini AI → structured clinical JSON           │
+│  /api/fhir        proxy → HAPI FHIR Java service                │
+│  /api/reconcile   ICD-10 diff + ₹ claim delta                   │
+│  /api/claims      claim lifecycle (create/read/status)           │
+│  /api/preauth     pre-auth form auto-fill (ABHA lookup)           │
+│  /api/discharge   discharge processing pipeline                  │
+│  /api/enhancement AI claim enhancement                           │
+│  /api/settlement  settlement parsing & confirmation              │
+│  /api/finance     finance reconciliation & reporting             │
+│  /api/analytics   KPIs, trends, dashboard metrics               │
+│  /api/auth        Supabase session validation                    │
+│  /ws/notifications  WebSocket real-time notifications            │
+└────┬──────────────────────┬─────────────────────┬───────────────┘
+     │ google-genai          │ httpx                │ supabase-py
+     ▼                       ▼                      ▼
+┌──────────────┐   ┌──────────────────────┐   ┌──────────────────┐
+│ Gemini AI    │   │ HAPI FHIR  :8001     │   │ Supabase         │
+│ (multimodal) │   │ (Java Spring Boot)   │   │ (PostgreSQL +    │
+│              │   │ POST /fhir/bundle    │   │  Auth + RLS)     │
+└──────────────┘   └──────────────────────┘   └──────────────────┘
 ```
+
+### User Roles
+
+| Role | Description | Key Permissions |
+|------|-------------|----------------|
+| `HOSPITAL` | Hospital billing clerk / RCM team | Upload documents, trigger extraction, review claims |
+| `TPA` | Third-party administrator officer | Review & approve/reject pre-auth requests |
+| `FINANCE` | Finance / settlement team | Access settlement and finance reconciliation reports |
 
 ### FHIR Resources Generated
 
@@ -153,14 +203,18 @@ normclaim/
 
 ## Tech Stack
 
-| Layer | Technology | Why |
-|-------|-----------|-----|
-| Backend API | FastAPI · Python 3.11 | Async REST, auto OpenAPI docs, all ML libraries |
-| AI Extraction | Gemini 1.5 Flash + pdfplumber | Multimodal (text + scanned images), 1,500 free req/day |
-| FHIR Mapping | HAPI FHIR R4 · Spring Boot (Java) | Gold-standard FHIR library, R4 validation built-in |
-| ICD-10 Validation | rapidfuzz · local ICD-10 JSON | No paid API, fuzzy-corrects LLM code outputs offline |
-| Frontend | Android (Java, Retrofit2) + HTML/JS | Clerk on mobile, RCM manager on web dashboard |
-| Storage | SQLite → PostgreSQL (prod) | Zero setup for demo, one-line config swap for production |
+| Layer | Technology | Notes |
+|-------|-----------|-------|
+| Backend API | FastAPI · Python 3.11 | Async REST, auto OpenAPI docs |
+| AI Extraction | Gemini AI + pdfplumber + PyMuPDF | Multimodal (text + scanned images) |
+| NLP | spaCy 3.7 · medspaCy · rapidfuzz | Clinical NER, fuzzy ICD-10 correction |
+| FHIR Mapping | HAPI FHIR R4 · Spring Boot (Java 17) | ABDM-compliant R4 Bundle validation |
+| Auth & Database | Supabase (PostgreSQL + Auth + RLS) | JWT auth, row-level security per role |
+| Web Frontend | React 19 · TypeScript · Vite · Tailwind CSS | Role-aware SPA with real-time notifications |
+| Android App | Java · Retrofit2 | Mobile upload & claim review |
+| Real-time | WebSocket (FastAPI) | Live claim status & notification push |
+| Storage | Supabase PostgreSQL (dev & prod) | SQLAlchemy ORM + direct Supabase client |
+| Containerization | Docker · Docker Compose | One-command local stack |
 
 ---
 
@@ -170,16 +224,42 @@ normclaim/
 
 - Python 3.11+
 - Java 17+ and Maven 3.8+
-- Android Studio (for Android app)
+- Node.js 18+ (for the web dashboard)
+- Android Studio (optional, for the Android app)
 - A [Gemini API key](https://aistudio.google.com/app/apikey) (free tier: 1,500 req/day)
+- A [Supabase](https://supabase.com) project (free tier available)
 
 ### 1. Clone & configure
 
 ```bash
-git clone https://github.com/Aethe-ui/NormClaim.git
-cd NormClaim
-cp .env.example .env
-# Edit .env and set GEMINI_API_KEY=your_key_here
+git clone https://github.com/jhkaizenunit2026/NormClaim1.0.git
+cd NormClaim1.0
+```
+
+Create a `.env` file in the project root with the following variables:
+
+```bash
+# Gemini AI — https://aistudio.google.com/app/apikey
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Supabase — https://app.supabase.com/project/_/settings/api
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=your-anon-key-here
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+
+# Service URLs (defaults work with Docker Compose)
+FHIR_SERVICE_URL=http://localhost:8001/fhir/bundle
+BACKEND_URL=http://localhost:8000
+
+# Optional: comma-separated extra CORS origins
+# CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+```
+
+Apply the database schema to your Supabase project:
+
+```bash
+# In Supabase Dashboard → SQL Editor, run:
+backend/sql/normclaim_full_schema.sql
 ```
 
 ### 2. Run with Docker Compose (recommended)
@@ -191,8 +271,7 @@ docker compose up --build
 Services will be available at:
 - Backend API: `http://localhost:8000`
 - FHIR Service: `http://localhost:8001`
-- Web Dashboard: `http://localhost:3000`
-- API Docs: `http://localhost:8000/docs`
+- API Docs (Swagger): `http://localhost:8000/docs`
 
 ### 3. Run manually
 
@@ -210,18 +289,21 @@ mvn spring-boot:run
 # Starts on port 8001
 ```
 
-**Web Dashboard:**
+**Web Dashboard (React/Vite):**
 ```bash
 cd web-dashboard
-# Open index.html directly in browser, or serve with:
-python -m http.server 3000
+cp authentication/.env.example .env.local
+# Fill in Supabase values in .env.local
+npm install
+npm run dev
+# Opens at http://localhost:5173
 ```
 
 **Android App:**
 ```
 Open android/ in Android Studio
-Set BASE_URL in app/build.gradle to your machine's IP
-Run on emulator (use http://10.0.2.2:8000) or physical device
+Set BASE_URL in app/build.gradle to your machine's IP (or http://10.0.2.2:8000 for emulator)
+Run on emulator or physical device
 ```
 
 ### 4. Generate test data
@@ -232,11 +314,26 @@ python test-data/generate.py
 # Creates 4 synthetic PDFs in test-data/
 ```
 
+### 5. Smoke test the API
+
+```bash
+# Requires a valid Supabase access token
+ACCESS_TOKEN=your_jwt_token ./scripts/smoke_api.sh test-data/discharge_simple.pdf
+```
+
 ---
 
 ## API Reference
 
-All endpoints are documented at `http://localhost:8000/docs` (Swagger UI).
+All endpoints require a Supabase JWT in the `Authorization: Bearer <token>` header unless noted otherwise.
+Full interactive documentation is available at `http://localhost:8000/docs` (Swagger UI).
+
+### Health check (no auth required)
+```http
+GET /health
+
+→ { "status": "ok", "service": "normclaim-backend", "version": "1.0.0", ... }
+```
 
 ### Upload a document
 ```http
@@ -244,6 +341,7 @@ POST /api/documents
 Content-Type: multipart/form-data
 
 file: <PDF file>
+consent_obtained: true
 
 → { "document_id": "uuid", "filename": "...", "status": "uploaded" }
 ```
@@ -293,6 +391,27 @@ POST /api/reconcile/{document_id}
   }
 ```
 
+### Pre-auth pipeline
+```http
+POST /api/preauth/extract        # Extract clinical entities for pre-auth
+POST /api/preauth/fill           # Auto-fill pre-auth form fields
+GET  /api/preauth/forms          # List submitted pre-auth forms
+```
+
+### Claim lifecycle
+```http
+GET    /api/claims               # List claims (filter by ?status= or ?stage=)
+GET    /api/claims/{id}          # Get single claim
+POST   /api/claims               # Create claim
+PATCH  /api/claims/{id}/status   # Update claim status
+```
+
+### Notifications (WebSocket)
+```
+ws://localhost:8000/ws/notifications?token=<jwt>
+```
+Clients receive JSON push events when claim status changes.
+
 ---
 
 ## Demo Walkthrough
@@ -325,25 +444,33 @@ The prototype ships with a synthetic discharge summary (`test-data/discharge_com
 
 ## Environment Variables
 
-```bash
-# .env
-GEMINI_API_KEY=your_gemini_api_key_here     # Required — get free at aistudio.google.com
-FHIR_SERVICE_URL=http://localhost:8001/fhir/bundle
-BACKEND_URL=http://localhost:8000
-```
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GEMINI_API_KEY` | ✅ | Gemini AI API key — [get free key](https://aistudio.google.com/app/apikey) |
+| `SUPABASE_URL` | ✅ | Supabase project URL |
+| `SUPABASE_ANON_KEY` | ✅ | Supabase anon (public) key |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Supabase service role key (backend only, never expose to client) |
+| `FHIR_SERVICE_URL` | — | HAPI FHIR service URL (default: `http://localhost:8001/fhir/bundle`) |
+| `BACKEND_URL` | — | Backend base URL (default: `http://localhost:8000`) |
+| `CORS_ORIGINS` | — | Comma-separated allowed CORS origins |
 
-Never commit `.env` to version control. A `.env.example` with placeholder values is provided.
+Never commit `.env` or `.env.local` to version control.
 
 ---
 
 ## Roadmap
 
-### Phase 1 — Hackathon MVP (current)
+### Phase 1 — Hackathon MVP ✅
 - [x] 4-layer pipeline (ingest → extract → FHIR map → reconcile)
 - [x] ABDM-aligned FHIR R4 Bundle generation
 - [x] ICD-10 gap analysis with ₹ delta
-- [x] Android app (Java) + web dashboard
-- [x] Offline-capable demo with pre-cached results
+- [x] Android app (Java) + React web dashboard
+- [x] Role-based access control (HOSPITAL / TPA / FINANCE)
+- [x] Supabase authentication with row-level security
+- [x] Pre-auth form auto-fill pipeline (ABHA lookup)
+- [x] Real-time WebSocket notifications
+- [x] Full claim lifecycle management
+- [x] Finance reconciliation and settlement processing
 
 ### Phase 2 — Pilot (3 months)
 - [ ] Deploy at 2–3 SME hospitals in Tier 2 cities
@@ -356,7 +483,7 @@ Never commit `.env` to version control. A `.env.example` with placeholder values
 - [ ] SaaS pricing: ₹5,000–15,000 per hospital per month
 - [ ] TPA and insurer API direct integrations
 - [ ] Batch processing for historical document backfill
-- [ ] PostgreSQL + S3 for production storage
+- [ ] S3 / object storage for PDF archiving
 
 ---
 
