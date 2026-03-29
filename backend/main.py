@@ -8,6 +8,7 @@ Run with: uvicorn main:app --reload --port 8000
 
 import os
 import logging
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,6 +27,46 @@ logging.basicConfig(
 logger = logging.getLogger("normclaim")
 
 # ── Create FastAPI app ────────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup
+    logger.info("=" * 60)
+    logger.info("  NormClaim Backend — Starting up")
+    logger.info("=" * 60)
+
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
+    if not gemini_key or gemini_key == "your_gemini_api_key_here":
+        logger.warning(
+            "⚠  GEMINI_API_KEY not set! "
+            "Get one free at: https://aistudio.google.com/app/apikey"
+        )
+    else:
+        logger.info(f"✓  Gemini API key configured (ends with ...{gemini_key[-4:]})")
+
+    fhir_url = os.environ.get("FHIR_SERVICE_URL", "http://localhost:8001/fhir/bundle")
+    logger.info(f"✓  FHIR service URL: {fhir_url}")
+    logger.info("✓  API docs available at: http://localhost:8000/docs")
+
+    from services.persistence import bootstrap_memory_caches
+    from Extraction_pipeline.database import get_supabase as get_extraction_supabase
+
+    try:
+        bootstrap_memory_caches()
+    except Exception as e:
+        logger.warning("SQLite bootstrap skipped or failed: %s", e)
+
+    try:
+        extraction_supabase = get_extraction_supabase()
+        extraction_supabase.table("pre_auth_forms").select("id").limit(1).execute()
+        logger.info("✓  Extraction pipeline readiness check passed")
+    except Exception as e:
+        logger.warning("⚠  Extraction pipeline readiness check failed: %s", e)
+
+    logger.info("=" * 60)
+    yield
+    # shutdown (nothing needed yet)
+
+
 app = FastAPI(
     title="NormClaim API",
     description=(
@@ -36,12 +77,13 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # ── CORS middleware ───────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -60,6 +102,10 @@ from routers.auth import router as auth_router
 from routers.config import router as config_router
 from routers.claims import router as claims_router
 from routers.notifications import router as notifications_router
+from routers.discharge import router as discharge_router
+from routers.enhancement import router as enhancement_router
+from routers.settlement import router as settlement_router
+from routers.finance import router as finance_router
 from Extraction_pipeline.router import router as preauth_router
 
 app.include_router(documents_router)
@@ -74,6 +120,10 @@ app.include_router(auth_router)
 app.include_router(config_router)
 app.include_router(claims_router)
 app.include_router(notifications_router)
+app.include_router(discharge_router)
+app.include_router(enhancement_router)
+app.include_router(settlement_router)
+app.include_router(finance_router)
 app.include_router(preauth_router, prefix="/api/preauth", tags=["pre-auth"])
 
 
@@ -114,44 +164,6 @@ async def health():
         "gemini_api_key_configured": gemini_configured,
         "supabase_configured": supabase_configured,
     }
-
-
-# ── Startup event ────────────────────────────────────────────────────────
-@app.on_event("startup")
-async def startup_event():
-    logger.info("=" * 60)
-    logger.info("  NormClaim Backend — Starting up")
-    logger.info("=" * 60)
-
-    gemini_key = os.environ.get("GEMINI_API_KEY", "")
-    if not gemini_key or gemini_key == "your_gemini_api_key_here":
-        logger.warning(
-            "⚠  GEMINI_API_KEY not set! "
-            "Get one free at: https://aistudio.google.com/app/apikey"
-        )
-    else:
-        logger.info(f"✓  Gemini API key configured (ends with ...{gemini_key[-4:]})")
-
-    fhir_url = os.environ.get("FHIR_SERVICE_URL", "http://localhost:8001/fhir/bundle")
-    logger.info(f"✓  FHIR service URL: {fhir_url}")
-    logger.info("✓  API docs available at: http://localhost:8000/docs")
-
-    from services.persistence import bootstrap_memory_caches
-    from Extraction_pipeline.database import get_supabase as get_extraction_supabase
-
-    try:
-        bootstrap_memory_caches()
-    except Exception as e:
-        logger.warning("SQLite bootstrap skipped or failed: %s", e)
-
-    try:
-        extraction_supabase = get_extraction_supabase()
-        extraction_supabase.table("pre_auth_forms").select("id").limit(1).execute()
-        logger.info("✓  Extraction pipeline readiness check passed")
-    except Exception as e:
-        logger.warning("⚠  Extraction pipeline readiness check failed: %s", e)
-
-    logger.info("=" * 60)
 
 
 if __name__ == "__main__":

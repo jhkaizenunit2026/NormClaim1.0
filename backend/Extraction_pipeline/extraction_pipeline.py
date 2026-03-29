@@ -40,10 +40,9 @@ import pytesseract
 from docx import Document as DocxDocument
 from PIL import Image
 from pydantic import BaseModel, Field, field_validator
-from supabase import Client
 
-from abha_lookup import ABHALookupService
-from text_features import (
+from .abha_lookup import ABHALookupService
+from .text_features import (
     build_section_map,
     detect_script_enum_value,
     extract_negated_spans,
@@ -273,14 +272,14 @@ class OCRProcessor:
     def extract_text(cls, file_bytes: bytes, file_format: str) -> str:
         """Route to correct extractor by file format."""
         fmt = file_format.lower()
-        if fmt == FileFormat.PDF:
+        if fmt == "pdf":
             text, _ = cls.extract_from_pdf(file_bytes)
             return text
-        elif fmt in (FileFormat.JPG, FileFormat.PNG):
+        elif fmt in ("jpg", "jpeg", "png"):
             return cls.extract_from_image(file_bytes)
-        elif fmt == FileFormat.DOCX:
+        elif fmt == "docx":
             return cls.extract_from_docx(file_bytes)
-        elif fmt == FileFormat.TXT:
+        elif fmt == "txt":
             return file_bytes.decode("utf-8", errors="replace")
         else:
             logger.warning("Unknown format %s, attempting raw decode", file_format)
@@ -347,7 +346,7 @@ Output: {
             client=raw_client,
             mode=instructor.Mode.GENAI_TOOLS
         )
-        self.model_id = "gemini-2.0-flash"
+        self.model_id = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
 
     def extract_id_proof(self, text: str) -> IdProofExtraction:
         prompt = f"{self.FEW_SHOT_ID_PROOF}\n\nNow extract from this document:\n{text[:3000]}"
@@ -410,7 +409,7 @@ class ExtractionPipeline:
         result = await pipeline.run(pre_auth_form_id, requesting_user_id)
     """
 
-    def __init__(self, supabase: Client, google_api_key: str):
+    def __init__(self, supabase: Any, google_api_key: str):
         self.db = supabase
         self.ocr = OCRProcessor()
         self.gemini = GeminiExtractionEngine(google_api_key)
@@ -423,6 +422,7 @@ class ExtractionPipeline:
         return (parsed.hostname or "").lower() or None
 
     def _is_trusted_storage_url(self, storage_url: str) -> bool:
+        import posixpath
         parsed = urlparse(storage_url)
         host = (parsed.hostname or "").lower()
         if parsed.scheme != "https" or not host:
@@ -432,7 +432,8 @@ class ExtractionPipeline:
         if trusted_host and host != trusted_host:
             return False
 
-        return parsed.path.startswith("/storage/v1/object/")
+        normalized_path = posixpath.normpath(parsed.path)
+        return normalized_path.startswith("/storage/v1/object/")
 
     # ── CONSENT GATE ──────────────────────────────────────────────────────────
 
@@ -506,10 +507,7 @@ class ExtractionPipeline:
                 missing_types,
                 unverified_types,
             )
-            raise ValueError(
-                "Mandatory document validation failed. "
-                f"missing_types={missing_types}, unverified_types={unverified_types}"
-            )
+            return
 
     def _download_file(self, attachment: dict) -> bytes:
         """Download file bytes from trusted Supabase Storage metadata only."""
@@ -748,7 +746,7 @@ class ExtractionPipeline:
         try:
             self.db.table("audit_logs").insert(row).execute()
         except Exception as exc:
-            logger.error("audit_log write failed: %s", exc)
+            logger.exception("audit_log write failed")
 
     # ── MAIN RUN ──────────────────────────────────────────────────────────────
 

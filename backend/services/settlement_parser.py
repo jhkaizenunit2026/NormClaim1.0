@@ -63,7 +63,7 @@ Rules:
         try:
             self.db.table("audit_logs").insert(row).execute()
         except Exception as exc:
-            logger.error("audit_log write failed: %s", exc)
+            logger.exception("audit_log write failed")
 
     def _ocr_text(self, file_bytes: bytes, file_format: str) -> str:
         from Extraction_pipeline.extraction_pipeline import OCRProcessor

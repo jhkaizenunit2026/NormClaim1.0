@@ -23,8 +23,9 @@ def validate_access_token(authorization: Optional[str] = Header(default=None)) -
 
     try:
         from main import supabase_auth
-    except Exception as exc:  # pragma: no cover - defensive import guard
-        raise HTTPException(status_code=503, detail="Auth service unavailable") from exc
+    except ImportError as exc:
+        raise HTTPException(status_code=503,
+            detail=f"Auth service unavailable: {exc}") from exc
 
     if supabase_auth is None:
         raise HTTPException(status_code=503, detail="Supabase auth client not configured")

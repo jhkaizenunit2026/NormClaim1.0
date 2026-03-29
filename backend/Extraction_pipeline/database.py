@@ -48,21 +48,21 @@ class StorageBucketAdapter:
         from main import supabase_admin
 
         if supabase_admin is None:
-            raise RuntimeError("Supabase storage client is not configured")
+            raise RuntimeError("Supabase admin client not yet initialised — call after app startup")
         return supabase_admin.storage.from_(self.bucket).upload(key, payload)
 
     def download(self, key: str):
         from main import supabase_admin
 
         if supabase_admin is None:
-            raise RuntimeError("Supabase storage client is not configured")
+            raise RuntimeError("Supabase admin client not yet initialised — call after app startup")
         return supabase_admin.storage.from_(self.bucket).download(key)
 
     def get_public_url(self, key: str):
         from main import supabase_admin
 
         if supabase_admin is None:
-            raise RuntimeError("Supabase storage client is not configured")
+            raise RuntimeError("Supabase admin client not yet initialised — call after app startup")
         return supabase_admin.storage.from_(self.bucket).get_public_url(key)
 
 

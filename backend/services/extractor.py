@@ -46,6 +46,11 @@ MAX_RETRIES = 3
 RETRY_DELAYS = [2, 4, 8]
 GEMINI_MODEL = "gemini-2.5-flash-lite"
 
+
+def resolved_gemini_model() -> str:
+    """Return the active Gemini model ID from env or fall back to the module default."""
+    return os.environ.get("GEMINI_MODEL", GEMINI_MODEL)
+
 FEW_SHOT_EXAMPLES = r"""
 EXAMPLE (discharge summary style — mirror this structure):
 Input expanded_text contains: "Discharge diagnosis: CAP J18.9. k/c/o T2DM E11.9, HTN I10, CKD N18.3. No h/o TB."

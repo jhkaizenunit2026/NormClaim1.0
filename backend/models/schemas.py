@@ -4,7 +4,7 @@ All I/O schemas for the NormClaim API.
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 
 
 class PatientInfo(BaseModel):
@@ -148,6 +148,42 @@ class DocumentListResponse(BaseModel):
     """Response for list-all-documents endpoint."""
     documents: List[DocumentMeta]
     total: int
+
+
+# ── Discharge / Settlement / Finance Models ──────────────────────────────────
+
+class BillBreakdownLineItem(BaseModel):
+    category: str
+    amount_inr: float
+
+
+class BillBreakdown(BaseModel):
+    room_charges: float = 0.0
+    medicines: float = 0.0
+    procedures: float = 0.0
+    investigations: float = 0.0
+    doctor_fees: float = 0.0
+    nursing_charges: float = 0.0
+    consumables: float = 0.0
+    total: float = 0.0
+    confidence: float = Field(ge=0.0, le=1.0, default=0.0)
+
+
+class SettlementDeductionItem(BaseModel):
+    description: str
+    amount: float
+    reason: Optional[str] = None
+
+
+class SettlementLetterExtraction(BaseModel):
+    utr_number: Optional[str] = None
+    settlement_amount: Optional[float] = None
+    tds_amount: Optional[float] = None
+    deductions: List[SettlementDeductionItem] = Field(default_factory=list)
+    final_payable: Optional[float] = None
+    settlement_date: Optional[str] = None
+    remarks: Optional[str] = None
+    confidence: float = Field(ge=0.0, le=1.0, default=0.5)
 
 
 class ClaimCreateRequest(BaseModel):

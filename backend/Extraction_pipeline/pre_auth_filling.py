@@ -26,19 +26,8 @@ from difflib import SequenceMatcher
 from typing import Any
 
 from pydantic import BaseModel, Field
-from supabase import Client
 
-import os as _os, sys as _sys
-# Ensure backend/ and Extraction_pipeline/ are on sys.path so both absolute
-# package imports (e.g. Extraction_pipeline.database) and bare intra-package
-# imports (e.g. abha_lookup) resolve correctly when this file is run directly.
-_backend_dir = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
-_pkg_dir = _os.path.join(_backend_dir, "Extraction_pipeline")
-for _p in (_backend_dir, _pkg_dir):
-    if _p not in _sys.path:
-        _sys.path.insert(0, _p)
-
-from Extraction_pipeline.extraction_pipeline import (
+from .extraction_pipeline import (
     CONFIDENCE_THRESHOLD,
     CombinedExtraction,
     DiagnosisReportExtraction,
@@ -336,7 +325,7 @@ class PreAuthFiller:
         result = filler.fill(pre_auth_form_id, ai_extraction_id, user_id)
     """
 
-    def __init__(self, supabase: Client):
+    def __init__(self, supabase: Any):
         self.db = supabase
 
     # ── FETCH HELPERS ─────────────────────────────────────────────────────────
@@ -398,7 +387,7 @@ class PreAuthFiller:
         NormClaim rule: ai_extraction_records is created once;
         discharge_summary_json and FHIR bundle reference it — no re-extraction.
         """
-        from Extraction_pipeline.extraction_pipeline import (
+        from .extraction_pipeline import (
             DiagnosisItem,
             MedicationItem,
             ProcedureItem,
@@ -414,6 +403,13 @@ class PreAuthFiller:
         diag_items = [DiagnosisItem(**d) for d in diagnoses_raw]
         med_items = [MedicationItem(**m) for m in medications_raw]
         proc_items = [ProcedureItem(**p) for p in procedures_raw]
+
+        if not diag_items:
+            logger.warning(
+                "ai_extraction %s has no diagnosis items — "
+                "primary_diagnosis_text will not be auto-filled",
+                extraction_row.get("id"),
+            )
 
         # Identify primary diagnosis
         primary = next((d for d in diag_items if d.is_primary), None)
@@ -510,7 +506,7 @@ class PreAuthFiller:
                 FieldMapping(
                     field_name="id_proof_type",
                     value=inferred_id_type,
-                    confidence=1.0 if patient_id_type in allowed_types else 0.8,
+                    confidence=1.0 if patient_id_type in allowed_types else 0.65,
                     source=source,
                     should_write=True,
                 )
@@ -535,11 +531,11 @@ class PreAuthFiller:
         for m in mappings:
             report["fields"].append({
                 "field_name": m.field_name,
-                "value": m.value,
                 "confidence": m.confidence,
                 "source": m.source,
                 "needs_review": not m.should_write or m.confidence < CONFIDENCE_THRESHOLD,
                 "written": m.should_write,
+                # value intentionally omitted from external report
             })
         return report
 
@@ -625,7 +621,7 @@ class PreAuthFiller:
         try:
             self.db.table("audit_logs").insert(row).execute()
         except Exception as exc:
-            logger.error("audit_log write failed: %s", exc)
+            logger.exception("audit_log write failed")
 
     # ── MAIN FILL ─────────────────────────────────────────────────────────────
 
@@ -809,7 +805,7 @@ class CorrectionHandler:
       5. If all mandatory fields now filled, transitions form_status → submitted
     """
 
-    def __init__(self, supabase: Client):
+    def __init__(self, supabase: Any):
         self.db = supabase
 
     def apply_correction(
@@ -849,15 +845,11 @@ class CorrectionHandler:
             normalized_meta = build_field_requirements_meta(set(auto_filled))
             for field_name_key, field_meta in meta.items():
                 if isinstance(field_meta, dict):
-                    if field_name_key in normalized_meta:
-                        normalized_meta[field_name_key]["filled"] = bool(
-                            field_meta.get("filled")
-                        )
-                    else:
-                        normalized_meta[field_name_key] = {
-                            "requirement": field_meta.get("requirement", "optional"),
-                            "filled": bool(field_meta.get("filled")),
-                        }
+                    if field_name_key not in normalized_meta:
+                        continue  # skip unknown fields
+                    normalized_meta[field_name_key]["filled"] = bool(
+                        field_meta.get("filled")
+                    )
             meta = normalized_meta
 
         # Update the specific field
@@ -948,7 +940,7 @@ class PreAuthOrchestrator:
         result = orchestrator.process(pre_auth_form_id, user_id)
     """
 
-    def __init__(self, supabase: Client, google_api_key: str):
+    def __init__(self, supabase: Any, google_api_key: str):
         self.extraction_pipeline = ExtractionPipeline(supabase, google_api_key)
         self.filler = PreAuthFiller(supabase)
         self.correction_handler = CorrectionHandler(supabase)
