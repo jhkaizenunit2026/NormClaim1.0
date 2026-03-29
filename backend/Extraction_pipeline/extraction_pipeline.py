@@ -31,7 +31,7 @@ from urllib.parse import urlparse
 
 import google.genai as gen
 import cv2
-import pymupdf as fitz
+import fitz
 import httpx
 import instructor
 import numpy as np
@@ -42,8 +42,8 @@ from PIL import Image
 from pydantic import BaseModel, Field, field_validator
 from supabase import Client
 
-from .abha_lookup import ABHALookupService
-from .text_features import (
+from abha_lookup import ABHALookupService
+from text_features import (
     build_section_map,
     detect_script_enum_value,
     extract_negated_spans,
@@ -343,9 +343,9 @@ Output: {
 
     def __init__(self, google_api_key: str):
         raw_client = gen.Client(api_key=google_api_key)
-        self.client = instructor.from_gemini(
+        self.client = instructor.from_genai(
             client=raw_client,
-            mode=instructor.Mode.GEMINI_JSON
+            mode=instructor.Mode.GENAI_TOOLS
         )
         self.model_id = "gemini-2.0-flash"
 

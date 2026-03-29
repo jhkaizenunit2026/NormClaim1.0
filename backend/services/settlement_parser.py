@@ -35,9 +35,9 @@ Rules:
         self.db = db or get_supabase()
         api_key = get_google_api_key()
         raw_client = gen.Client(api_key=api_key)
-        self._client = instructor.from_gemini(
+        self._client = instructor.from_genai(
             client=raw_client,
-            mode=instructor.Mode.GEMINI_JSON,
+            mode=instructor.Mode.GENAI_TOOLS,
         )
 
     def _audit_log(

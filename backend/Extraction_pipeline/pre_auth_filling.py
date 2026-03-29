@@ -28,7 +28,17 @@ from typing import Any
 from pydantic import BaseModel, Field
 from supabase import Client
 
-from .extraction_pipeline import (
+import os as _os, sys as _sys
+# Ensure backend/ and Extraction_pipeline/ are on sys.path so both absolute
+# package imports (e.g. Extraction_pipeline.database) and bare intra-package
+# imports (e.g. abha_lookup) resolve correctly when this file is run directly.
+_backend_dir = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+_pkg_dir = _os.path.join(_backend_dir, "Extraction_pipeline")
+for _p in (_backend_dir, _pkg_dir):
+    if _p not in _sys.path:
+        _sys.path.insert(0, _p)
+
+from Extraction_pipeline.extraction_pipeline import (
     CONFIDENCE_THRESHOLD,
     CombinedExtraction,
     DiagnosisReportExtraction,
@@ -388,7 +398,7 @@ class PreAuthFiller:
         NormClaim rule: ai_extraction_records is created once;
         discharge_summary_json and FHIR bundle reference it — no re-extraction.
         """
-        from .extraction_pipeline import (
+        from Extraction_pipeline.extraction_pipeline import (
             DiagnosisItem,
             MedicationItem,
             ProcedureItem,

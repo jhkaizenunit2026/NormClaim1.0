@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-import google.generativeai as genai
+import google.genai as gen
 import instructor
 from pydantic import BaseModel, Field
 
@@ -51,11 +51,10 @@ confidence: your confidence in the category and advice (0.0–1.0).
 
     def __init__(self, db: Any | None = None):
         self.db = db or get_supabase()
-        genai.configure(api_key=get_google_api_key())
-        raw_client = genai.GenerativeModel(resolved_gemini_model())
-        self._client = instructor.from_gemini(
+        raw_client = gen.Client(api_key=get_google_api_key())
+        self._client = instructor.from_genai(
             client=raw_client,
-            mode=instructor.Mode.GEMINI_JSON,
+            mode=instructor.Mode.GENAI_TOOLS,
         )
 
     def _audit_log(
